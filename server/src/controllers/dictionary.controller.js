@@ -4,6 +4,7 @@ const canonicalTermsRepo = require('../repositories/canonicalTerms.repo');
 const termAliasesRepo = require('../repositories/termAliases.repo');
 const termDefinitionsRepo = require('../repositories/termDefinitions.repo');
 const recordTermLinksRepo = require('../repositories/recordTermLinks.repo');
+const webSearchService = require('../services/webSearch.service');
 const { normalizeSpaced } = require('../utils/textNormalize');
 
 const listTerms = asyncHandler(async (req, res) => {
@@ -98,6 +99,46 @@ const addAlias = asyncHandler(async (req, res) => {
   res.status(201).json({ data: alias });
 });
 
+const checkTypo = asyncHandler(async (req, res) => {
+  const term = await canonicalTermsRepo.findById(req.params.id);
+  if (!term) return res.status(404).json({ error: { message: 'Term not found' } });
+  const result = await webSearchService.checkSpelling(term.canonical_text);
+  res.json({ data: result });
+});
+
+const applyCorrection = asyncHandler(async (req, res) => {
+  const { correctedText } = req.body;
+  if (!correctedText?.trim()) return res.status(400).json({ error: { message: 'correctedText가 필요합니다' } });
+
+  const term = await canonicalTermsRepo.findById(req.params.id);
+  if (!term) return res.status(404).json({ error: { message: 'Term not found' } });
+
+  const trimmed = correctedText.trim();
+  const normalizedCorrected = normalizeSpaced(trimmed);
+  const existing = await canonicalTermsRepo.findByNormalized(term.term_type, normalizedCorrected);
+
+  if (existing && existing.id !== term.id) {
+    // the corrected spelling already exists as its own term -- merge this one into it,
+    // same as a manual merge, instead of creating a duplicate
+    await termAliasesRepo.create({
+      canonicalTermId: existing.id,
+      aliasText: term.canonical_text,
+      normalizedAliasText: term.normalized_text,
+      source: 'manual',
+    });
+    await termAliasesRepo.reassignCanonicalTerm(term.id, existing.id);
+    await recordTermLinksRepo.reassignCanonicalLinks(term.id, existing.id);
+    const updatedFromTerm = await canonicalTermsRepo.update(term.id, { status: 'merged_away', merged_into_id: existing.id });
+    return res.json({ data: { merged: true, fromTerm: updatedFromTerm, intoTerm: existing } });
+  }
+
+  const updated = await canonicalTermsRepo.update(term.id, {
+    canonical_text: trimmed,
+    normalized_text: normalizedCorrected,
+  });
+  res.json({ data: { merged: false, term: updated } });
+});
+
 const mergeTerms = asyncHandler(async (req, res) => {
   const { fromTermId, intoTermId } = req.body;
   if (!fromTermId || !intoTermId) {
@@ -127,4 +168,16 @@ const mergeTerms = asyncHandler(async (req, res) => {
   res.json({ data: { fromTerm: updatedFromTerm, intoTerm } });
 });
 
-module.exports = { listTerms, getTerm, createTerm, updateTerm, markReviewed, removeTerm, removeAllTerms, addAlias, mergeTerms };
+module.exports = {
+  listTerms,
+  getTerm,
+  createTerm,
+  updateTerm,
+  markReviewed,
+  removeTerm,
+  removeAllTerms,
+  addAlias,
+  mergeTerms,
+  checkTypo,
+  applyCorrection,
+};

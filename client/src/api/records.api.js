@@ -1,8 +1,4 @@
-import { get, post, del } from './client';
-
-export function createRecord(payload) {
-  return post('/records', payload);
-}
+import { get, del } from './client';
 
 export function listRecords(params = {}) {
   const cleaned = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''));

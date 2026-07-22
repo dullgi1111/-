@@ -3,12 +3,14 @@ import * as auditApi from '../api/audit.api';
 import { useToast } from '../components/ToastProvider';
 import { EmptyState } from '../components/EmptyState';
 import { Badge } from '../components/Badge';
+import { Modal } from '../components/Modal';
 
 export function MergeAuditPage() {
   const toast = useToast();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [revertingId, setRevertingId] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   function load() {
     setLoading(true);
@@ -37,9 +39,63 @@ export function MergeAuditPage() {
 
   return (
     <div>
-      <div className="hint">
-        자동 병합은 유사도 임계값 이상일 때 사람 개입 없이 즉시 실행됩니다. 잘못 병합된 항목은 여기서 되돌릴 수 있습니다.
+      <div className="hint" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <span>
+          자동 병합은 유사도 임계값 이상일 때 사람 개입 없이 즉시 실행됩니다. 잘못 병합된 항목은 여기서 되돌릴 수 있습니다.
+        </span>
+        <button
+          onClick={() => setShowHelp(true)}
+          aria-label="자동 병합 자세히 보기"
+          style={{
+            flexShrink: 0,
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            border: 'none',
+            background: 'var(--accent)',
+            color: '#fff',
+            fontSize: 11.5,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 1,
+          }}
+        >
+          ?
+        </button>
       </div>
+
+      {showHelp && (
+        <Modal onClose={() => setShowHelp(false)} title="자동 병합이란?" width={520}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, color: 'var(--ink2)', lineHeight: 1.7 }}>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--ink)' }}>어떻게 동작하나요?</div>
+              정비 이력을 처리하는 중 새로 나온 표현(예: "베어링마모")이 기존 표준 용어(예: "베어링 마모")와의
+              유사도가 기준치(기본 0.85) 이상이면, 시스템이 사람 확인 없이 즉시 그 표현을 별칭(alias)으로
+              자동 병합합니다.
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--ink)' }}>왜 사람이 매번 확인하지 않나요?</div>
+              업로드되는 정비 이력의 양이 많아서 모든 신규 표현을 사람이 매번 검토하기엔 비효율적입니다.
+              그래서 텍스트가 충분히 비슷한 경우엔 바로 합쳐서 자동으로 사전을 정리하고, 애매한 경우만
+              "검토 필요" 상태로 남겨둡니다.
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--ink)' }}>어떤 위험이 있나요?</div>
+              텍스트 유사도만으로 판단하기 때문에, 실제로는 의미가 다른데 글자가 우연히 비슷해서
+              잘못 합쳐지는 경우가 생길 수 있습니다. 이 화면(자동병합 로그)은 그런 자동 병합이 언제,
+              어떤 유사도 점수로 일어났는지 전부 기록해두는 감사 로그입니다.
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: 4, color: 'var(--ink)' }}>"되돌리기" 버튼은 뭔가요?</div>
+              특정 자동 병합이 잘못됐다고 판단되면 "되돌리기"를 눌러 그 병합을 취소할 수 있습니다.
+              되돌리면 해당 표현은 다시 별도의 표현으로 분리되어, 이후 정비 이력에서 독립적으로 처리됩니다.
+            </div>
+          </div>
+        </Modal>
+      )}
       <div className="card">
         <div className="card-t">
           <span>자동병합 로그</span>

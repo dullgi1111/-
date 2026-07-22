@@ -34,6 +34,24 @@ async function list({ equipment, dateFrom, dateTo, month, maintenanceType, compa
   return rows;
 }
 
+async function profileForEquipment(equipmentName) {
+  const { rows } = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       MIN(record_date) AS first_record_date,
+       MAX(record_date) AS last_record_date,
+       COUNT(*) FILTER (WHERE maintenance_type = 'breakdown_repair')::int AS breakdown_count,
+       COUNT(*) FILTER (WHERE maintenance_type = 'preventive_inspection')::int AS inspection_count,
+       COUNT(*) FILTER (WHERE maintenance_type = 'other')::int AS other_count,
+       COUNT(*) FILTER (WHERE maintenance_type = 'unknown')::int AS unknown_count,
+       ARRAY_REMOVE(ARRAY_AGG(DISTINCT company_source), NULL) AS companies
+     FROM maintenance_records
+     WHERE equipment_name = $1 AND is_deleted = false`,
+    [equipmentName]
+  );
+  return rows[0];
+}
+
 async function historyForEquipment(equipmentName) {
   const { rows } = await pool.query(
     'SELECT * FROM maintenance_records WHERE equipment_name = $1 AND is_deleted = false ORDER BY record_date DESC',
@@ -68,4 +86,4 @@ async function softDeleteAll() {
   return rowCount;
 }
 
-module.exports = { create, findById, list, historyForEquipment, update, softDelete, softDeleteAll };
+module.exports = { create, findById, list, profileForEquipment, historyForEquipment, update, softDelete, softDeleteAll };

@@ -3,7 +3,7 @@ import { AppShell } from './layout/AppShell';
 import { ToastProvider } from './components/ToastProvider';
 import { DashboardPage } from './pages/DashboardPage';
 import { RecordsPage } from './pages/RecordsPage';
-import { ManualEntryPage } from './pages/ManualEntryPage';
+import { ProductInfoPage } from './pages/ProductInfoPage';
 import { UploadWizardPage } from './pages/UploadWizardPage';
 import { DictionaryPage } from './pages/DictionaryPage';
 import { DictionaryImportPage } from './pages/DictionaryImportPage';
@@ -19,7 +19,7 @@ function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/records" element={<RecordsPage />} />
-            <Route path="/manual-entry" element={<ManualEntryPage />} />
+            <Route path="/products" element={<ProductInfoPage />} />
             <Route path="/upload" element={<UploadWizardPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
             <Route path="/dictionary/import" element={<DictionaryImportPage />} />

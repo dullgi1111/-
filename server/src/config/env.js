@@ -7,4 +7,6 @@ module.exports = {
   databaseUrl: process.env.DATABASE_URL,
   dbSsl: process.env.DB_SSL === 'true',
   termMergeThresholdDefault: parseFloat(process.env.TERM_MERGE_THRESHOLD || '0.85'),
+  googleSearchApiKey: process.env.GOOGLE_SEARCH_API_KEY || null,
+  googleSearchCx: process.env.GOOGLE_SEARCH_CX || null,
 };

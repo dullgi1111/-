@@ -45,4 +45,22 @@ const trends = asyncHandler(async (req, res) => {
   res.json({ data: rows });
 });
 
-module.exports = { summary, recentDiscoveries, recentMerges, trends };
+const equipmentStats = asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT
+      equipment_name,
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE maintenance_type = 'breakdown_repair')::int AS breakdown_count,
+      COUNT(*) FILTER (WHERE maintenance_type = 'preventive_inspection')::int AS inspection_count,
+      COUNT(*) FILTER (WHERE maintenance_type = 'other')::int AS other_count,
+      COUNT(*) FILTER (WHERE maintenance_type = 'unknown')::int AS unknown_count,
+      MAX(record_date) AS last_record_date
+    FROM maintenance_records
+    WHERE is_deleted = false
+    GROUP BY equipment_name
+    ORDER BY total DESC
+  `);
+  res.json({ data: rows });
+});
+
+module.exports = { summary, recentDiscoveries, recentMerges, trends, equipmentStats };

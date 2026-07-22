@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 const TITLES = {
   '/': '대시보드',
   '/records': '정비 이력',
-  '/manual-entry': '수동 입력',
+  '/products': '제품 정보',
   '/upload': '엑셀 업로드',
   '/dictionary': '용어 사전',
   '/dictionary/import': '용어집 가져오기',

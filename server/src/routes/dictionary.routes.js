@@ -12,6 +12,8 @@ router.put('/terms/:id', controller.updateTerm);
 router.post('/terms/:id/mark-reviewed', controller.markReviewed);
 router.delete('/terms/:id', controller.removeTerm);
 router.post('/terms/:id/aliases', controller.addAlias);
+router.post('/terms/:id/check-typo', controller.checkTypo);
+router.post('/terms/:id/apply-correction', controller.applyCorrection);
 router.post('/merge', controller.mergeTerms);
 router.post(
   '/import',

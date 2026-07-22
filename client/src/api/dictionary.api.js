@@ -38,6 +38,14 @@ export function mergeTerms(fromTermId, intoTermId) {
   return post('/dictionary/merge', { fromTermId, intoTermId });
 }
 
+export function checkTypo(id) {
+  return post(`/dictionary/terms/${id}/check-typo`);
+}
+
+export function applyCorrection(id, correctedText) {
+  return post(`/dictionary/terms/${id}/apply-correction`, { correctedText });
+}
+
 // entries: [{ file: File, termTypes: Array<'symptom'|'action'|'part'> }]
 // A file tagged with multiple types is appended once per type, so its content
 // gets imported separately under each selected term type.

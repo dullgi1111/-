@@ -155,7 +155,7 @@ export function RecordsPage() {
                 <tr>
                   <th>설비명</th>
                   <th>날짜</th>
-                  <th>유형</th>
+                  {!maintenanceType && <th>유형</th>}
                   <th>증상</th>
                   <th>조치내용</th>
                   <th>등록업체</th>
@@ -167,7 +167,7 @@ export function RecordsPage() {
                   <tr key={r.id}>
                     <td>{r.equipment_name}</td>
                     <td className="mono">{r.record_date}</td>
-                    <td><MaintenanceTypeBadge type={r.maintenance_type} /></td>
+                    {!maintenanceType && <td><MaintenanceTypeBadge type={r.maintenance_type} /></td>}
                     <td>{r.symptom_text || <span className="text-muted">-</span>}</td>
                     <td>{r.action_text || <span className="text-muted">-</span>}</td>
                     <td>{r.company_source || <span className="text-muted">-</span>}</td>

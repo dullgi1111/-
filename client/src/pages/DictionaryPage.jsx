@@ -34,6 +34,9 @@ export function DictionaryPage() {
   const [aliasDrafts, setAliasDrafts] = useState({});
   const [viewTerm, setViewTerm] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [typoCheck, setTypoCheck] = useState(null);
+  const [typoChecking, setTypoChecking] = useState(false);
+  const [applyingCorrection, setApplyingCorrection] = useState(false);
 
   function load() {
     setLoading(true);
@@ -83,6 +86,7 @@ export function DictionaryPage() {
 
   async function handleView(id) {
     setViewLoading(true);
+    setTypoCheck(null);
     try {
       const data = await dictionaryApi.getTerm(id);
       setViewTerm(data);
@@ -90,6 +94,38 @@ export function DictionaryPage() {
       toast.error(err.message);
     } finally {
       setViewLoading(false);
+    }
+  }
+
+  async function handleCheckTypo() {
+    setTypoChecking(true);
+    setTypoCheck(null);
+    try {
+      const result = await dictionaryApi.checkTypo(viewTerm.id);
+      setTypoCheck(result);
+      if (!result.hasSuggestion) toast.success('맞춤법 이상 없음');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setTypoChecking(false);
+    }
+  }
+
+  async function handleApplyCorrection() {
+    if (!typoCheck?.suggestedText) return;
+    if (!window.confirm(`"${viewTerm.canonical_text}"을(를) "${typoCheck.suggestedText}"(으)로 수정할까요?`)) return;
+    setApplyingCorrection(true);
+    try {
+      await dictionaryApi.applyCorrection(viewTerm.id, typoCheck.suggestedText);
+      toast.success('수정했습니다');
+      setTypoCheck(null);
+      const data = await dictionaryApi.getTerm(viewTerm.id);
+      setViewTerm(data);
+      load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setApplyingCorrection(false);
     }
   }
 
@@ -232,7 +268,7 @@ export function DictionaryPage() {
       </div>
 
       {(viewTerm || viewLoading) && (
-        <Modal onClose={() => setViewTerm(null)} title="용어 상세" width={560}>
+        <Modal onClose={() => { setViewTerm(null); setTypoCheck(null); }} title="용어 상세" width={560}>
           {viewLoading && !viewTerm ? (
             <div className="text-muted">불러오는 중...</div>
           ) : (
@@ -244,7 +280,12 @@ export function DictionaryPage() {
                 </div>
                 <div>
                   <div className="stat-label">표준 용어</div>
-                  <div style={{ fontWeight: 700 }}>{viewTerm.canonical_text}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 700 }}>{viewTerm.canonical_text}</span>
+                    <button className="btn btn-secondary btn-sm" onClick={handleCheckTypo} disabled={typoChecking}>
+                      {typoChecking ? '확인 중...' : '맞춤법 확인 (웹검색)'}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <div className="stat-label">사용 횟수</div>
@@ -255,6 +296,22 @@ export function DictionaryPage() {
                   <div>{viewTerm.needs_review ? <Badge variant="warn">검토 필요</Badge> : <Badge variant="ok">확인됨</Badge>}</div>
                 </div>
               </div>
+              {typoCheck?.hasSuggestion && (
+                <div className="hint" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <span>
+                    웹 검색 결과 다른 표기가 있을 수 있습니다: <strong>{viewTerm.canonical_text}</strong> → <strong>{typoCheck.suggestedText}</strong>
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-primary btn-sm" onClick={handleApplyCorrection} disabled={applyingCorrection}>
+                      {applyingCorrection ? '수정 중...' : '수정'}
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setTypoCheck(null)}>
+                      무시
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="card-t" style={{ marginTop: 4 }}>
                 <span>정의</span>
                 <small>여러 자료에서 모은 정의 {viewTerm.definitions.length}건</small>

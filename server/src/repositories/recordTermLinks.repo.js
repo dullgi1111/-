@@ -34,6 +34,27 @@ async function listRecordsUsingCanonicalTerm(canonicalTermId, limit = 10) {
   return rows;
 }
 
+async function topTermsForEquipment(equipmentName, limit = 5) {
+  const { rows } = await pool.query(
+    `SELECT l.field_type, ct.canonical_text, COUNT(*)::int AS count
+     FROM record_term_links l
+     JOIN maintenance_records mr ON mr.id = l.record_id
+     JOIN canonical_terms ct ON ct.id = l.canonical_term_id
+     WHERE mr.equipment_name = $1 AND mr.is_deleted = false
+     GROUP BY l.field_type, ct.canonical_text
+     ORDER BY count DESC`,
+    [equipmentName]
+  );
+  const byType = { symptom: [], action: [], part: [] };
+  for (const row of rows) {
+    const bucket = byType[row.field_type];
+    if (bucket && bucket.length < limit) {
+      bucket.push({ text: row.canonical_text, count: row.count });
+    }
+  }
+  return byType;
+}
+
 async function reassignAliasLinks(aliasId, newCanonicalTermId) {
   await pool.query(
     `UPDATE record_term_links SET canonical_term_id = $2, alias_id = NULL, match_type = 'new_discovery' WHERE alias_id = $1`,
@@ -48,4 +69,11 @@ async function reassignCanonicalLinks(oldCanonicalTermId, newCanonicalTermId) {
   ]);
 }
 
-module.exports = { create, listForRecord, listRecordsUsingCanonicalTerm, reassignAliasLinks, reassignCanonicalLinks };
+module.exports = {
+  create,
+  listForRecord,
+  listRecordsUsingCanonicalTerm,
+  topTermsForEquipment,
+  reassignAliasLinks,
+  reassignCanonicalLinks,
+};

@@ -15,3 +15,7 @@ export function getRecentMerges(limit = 20) {
 export function getTrends() {
   return get('/dashboard/trends');
 }
+
+export function getEquipmentStats() {
+  return get('/dashboard/equipment-stats');
+}
