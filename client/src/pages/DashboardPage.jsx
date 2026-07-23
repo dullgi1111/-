@@ -5,6 +5,7 @@ import { StatCard } from '../components/StatCard';
 import { EmptyState } from '../components/EmptyState';
 import { MatchTypeBadge } from '../components/Badge';
 import { TrendChart, TrendLegend } from '../components/TrendChart';
+import { LoadingHint } from '../components/LoadingHint';
 
 function DashPanel({ title, sub, linkTo, linkLabel, footer, fitContent, children }) {
   return (
@@ -64,7 +65,7 @@ export function DashboardPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="text-muted">불러오는 중...</div>;
+  if (loading) return <LoadingHint />;
   if (error) return <EmptyState>데이터를 불러오지 못했습니다: {error}</EmptyState>;
 
   const byType = Object.fromEntries((summary.byType || []).map((r) => [r.maintenance_type, r.count]));
