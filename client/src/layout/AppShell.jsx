@@ -9,6 +9,8 @@ const TITLES = {
   '/dictionary': '용어 사전',
   '/dictionary/import': '용어집 가져오기',
   '/equipment': '설비 이력 조회',
+  '/inventory': '재고 관리',
+  '/reports': '리포트',
   '/audit': '자동병합 로그',
   '/settings': '설정',
 };

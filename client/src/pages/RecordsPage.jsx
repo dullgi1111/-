@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as recordsApi from '../api/records.api';
 import { EmptyState } from '../components/EmptyState';
 import { MaintenanceTypeBadge, MatchTypeBadge, Badge } from '../components/Badge';
@@ -25,6 +26,13 @@ const MAINTENANCE_TYPE_LABELS = {
   unknown: '미상',
 };
 
+const TYPE_CONFIRM_OPTIONS = [
+  { value: 'breakdown_repair', label: '고장수리' },
+  { value: 'preventive_inspection', label: '예방점검' },
+  { value: 'other', label: '기타' },
+  { value: 'unknown', label: '미상' },
+];
+
 const FIELD_TYPE_LABELS = { symptom: '증상', action: '조치', part: '부품' };
 
 const CSV_HEADERS = [
@@ -47,17 +55,26 @@ export function RecordsPage() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchParams] = useSearchParams();
   const [equipment, setEquipment] = useState('');
-  const [maintenanceType, setMaintenanceType] = useState('');
+  const [maintenanceType, setMaintenanceType] = useState(searchParams.get('maintenanceType') || '');
   const [month, setMonth] = useState('');
+  const [needsTypeReview, setNeedsTypeReview] = useState(searchParams.get('needsTypeReview') === 'true');
   const [viewData, setViewData] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState(null);
+  const [correctingType, setCorrectingType] = useState(false);
+  const highlight = searchParams.get('highlight');
+  const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
+
+  useEffect(() => {
+    if (highlight) setAcknowledgedIds(new Set());
+  }, [highlight]);
 
   function load() {
     setLoading(true);
     recordsApi
-      .listRecords({ equipment, maintenanceType, month, limit: 100 })
+      .listRecords({ equipment, maintenanceType, month, needsTypeReview: needsTypeReview ? 'true' : undefined, limit: 100 })
       .then(setRecords)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -66,7 +83,7 @@ export function RecordsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maintenanceType, month]);
+  }, [maintenanceType, month, needsTypeReview]);
 
   function handleSearchSubmit(e) {
     e.preventDefault();
@@ -83,6 +100,20 @@ export function RecordsPage() {
       setViewError(err.message);
     } finally {
       setViewLoading(false);
+    }
+  }
+
+  async function handleConfirmType(maintenanceType) {
+    setCorrectingType(true);
+    try {
+      const updated = await recordsApi.confirmType(viewData.record.id, maintenanceType);
+      setViewData((prev) => ({ ...prev, record: updated }));
+      toast.success('분류를 확인했습니다');
+      load();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCorrectingType(false);
     }
   }
 
@@ -116,7 +147,7 @@ export function RecordsPage() {
         </div>
       </form>
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
         {MONTH_FILTERS.map((f) => (
           <span
             key={f.value}
@@ -126,6 +157,13 @@ export function RecordsPage() {
             {f.label}
           </span>
         ))}
+        <span
+          className={`chip${needsTypeReview ? ' active' : ''}`}
+          style={{ marginLeft: 8 }}
+          onClick={() => setNeedsTypeReview((v) => !v)}
+        >
+          분류 검토 필요
+        </span>
       </div>
 
       <div className="card">
@@ -163,21 +201,28 @@ export function RecordsPage() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.equipment_name}</td>
-                    <td className="mono">{r.record_date}</td>
-                    {!maintenanceType && <td><MaintenanceTypeBadge type={r.maintenance_type} /></td>}
-                    <td>{r.symptom_text || <span className="text-muted">-</span>}</td>
-                    <td>{r.action_text || <span className="text-muted">-</span>}</td>
-                    <td>{r.company_source || <span className="text-muted">-</span>}</td>
-                    <td>
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleView(r.id)}>
-                        자세히
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {records.map((r) => {
+                  const isPulsing = highlight && !r.type_confirmed && !acknowledgedIds.has(r.id);
+                  return (
+                    <tr
+                      key={r.id}
+                      className={isPulsing ? 'row-alert-pulse' : ''}
+                      onClick={() => setAcknowledgedIds((prev) => new Set(prev).add(r.id))}
+                    >
+                      <td>{r.equipment_name}</td>
+                      <td className="mono">{r.record_date}</td>
+                      {!maintenanceType && <td><MaintenanceTypeBadge type={r.maintenance_type} /></td>}
+                      <td>{r.symptom_text || <span className="text-muted">-</span>}</td>
+                      <td>{r.action_text || <span className="text-muted">-</span>}</td>
+                      <td>{r.company_source || <span className="text-muted">-</span>}</td>
+                      <td>
+                        <button className="btn btn-secondary btn-sm" onClick={() => handleView(r.id)}>
+                          자세히
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -201,7 +246,10 @@ export function RecordsPage() {
                 </div>
                 <div>
                   <div className="stat-label">유형</div>
-                  <div><MaintenanceTypeBadge type={viewData.record.maintenance_type} /></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <MaintenanceTypeBadge type={viewData.record.maintenance_type} />
+                    {!viewData.record.type_confirmed && <Badge variant="warn">검토 필요</Badge>}
+                  </div>
                 </div>
                 <div>
                   <div className="stat-label">등록업체</div>
@@ -223,6 +271,24 @@ export function RecordsPage() {
                   <div>{viewData.record.part_text || <span className="text-muted">-</span>}</div>
                 </div>
               </div>
+
+              {!viewData.record.type_confirmed && (
+                <div className="hint" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                  <span>이 유형은 시스템이 자동으로 추정한 값입니다. 맞는지 확인해주세요.</span>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {TYPE_CONFIRM_OPTIONS.map((f) => (
+                      <button
+                        key={f.value}
+                        className="btn btn-secondary btn-sm"
+                        disabled={correctingType}
+                        onClick={() => handleConfirmType(f.value)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="card-t" style={{ marginTop: 4 }}>
                 <span>인식된 표준 용어</span>

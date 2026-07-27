@@ -4,6 +4,8 @@ const recordPipeline = require('../services/recordPipeline.service');
 const maintenanceRecordsRepo = require('../repositories/maintenanceRecords.repo');
 const recordTermLinksRepo = require('../repositories/recordTermLinks.repo');
 
+const MAINTENANCE_TYPES = ['breakdown_repair', 'preventive_inspection', 'other', 'unknown'];
+
 const createRecordSchema = z.object({
   equipmentName: z.string().min(1),
   recordDate: z.string().min(1),
@@ -31,7 +33,7 @@ const create = asyncHandler(async (req, res) => {
 });
 
 const list = asyncHandler(async (req, res) => {
-  const { equipment, dateFrom, dateTo, month, maintenanceType, companySource, page, limit } = req.query;
+  const { equipment, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page, limit } = req.query;
   const rows = await maintenanceRecordsRepo.list({
     equipment,
     dateFrom,
@@ -39,6 +41,7 @@ const list = asyncHandler(async (req, res) => {
     month,
     maintenanceType,
     companySource,
+    needsTypeReview: needsTypeReview === 'true',
     page: page ? Number(page) : undefined,
     limit: limit ? Number(limit) : undefined,
   });
@@ -62,4 +65,19 @@ const removeAll = asyncHandler(async (req, res) => {
   res.json({ data: { deletedCount } });
 });
 
-module.exports = { create, list, getOne, remove, removeAll };
+const confirmType = asyncHandler(async (req, res) => {
+  const { maintenanceType } = req.body;
+  if (!MAINTENANCE_TYPES.includes(maintenanceType)) {
+    return res.status(400).json({ error: { message: `maintenanceType은 ${MAINTENANCE_TYPES.join(', ')} 중 하나여야 합니다` } });
+  }
+  const record = await maintenanceRecordsRepo.findById(req.params.id);
+  if (!record) return res.status(404).json({ error: { message: 'Record not found' } });
+  const updated = await maintenanceRecordsRepo.update(req.params.id, {
+    maintenance_type: maintenanceType,
+    maintenance_type_source: 'manual',
+    type_confirmed: true,
+  });
+  res.json({ data: updated });
+});
+
+module.exports = { create, list, getOne, remove, removeAll, confirmType };

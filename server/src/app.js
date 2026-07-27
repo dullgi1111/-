@@ -10,6 +10,7 @@ const auditRoutes = require('./routes/audit.routes');
 const settingsRoutes = require('./routes/settings.routes');
 const classificationRulesRoutes = require('./routes/classificationRules.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const inventoryRoutes = require('./routes/inventory.routes');
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/classification-rules', classificationRulesRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ error: { message: 'Not found' } });

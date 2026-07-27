@@ -1,5 +1,6 @@
 const classificationService = require('./classification.service');
 const termMatchingService = require('./termMatching.service');
+const equipmentMatchingService = require('./equipmentMatching.service');
 const maintenanceRecordsRepo = require('../repositories/maintenanceRecords.repo');
 const recordTermLinksRepo = require('../repositories/recordTermLinks.repo');
 const { splitPhrases, isTooLong } = require('../utils/phraseSplit');
@@ -22,9 +23,12 @@ async function processRecord({
     mappedRawValue: mappedMaintenanceTypeRawValue,
   });
 
+  const equipmentResolved = await equipmentMatchingService.resolveEquipmentName(equipmentName);
+
   const record = await maintenanceRecordsRepo.create({
     batch_id: batchId || null,
     raw_row_id: rawRowId || null,
+    equipment_id: equipmentResolved ? equipmentResolved.equipmentId : null,
     equipment_name: equipmentName,
     record_date: recordDate,
     company_source: companySource || null,
@@ -33,6 +37,7 @@ async function processRecord({
     maintenance_type_raw_value: classification.rawValue,
     maintenance_type_confidence: classification.confidence,
     matched_keywords: classification.matchedKeywords,
+    type_confirmed: classification.source === 'mapped_column',
     symptom_text: symptomText || null,
     action_text: actionText || null,
     part_text: partText || null,

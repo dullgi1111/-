@@ -8,6 +8,7 @@ const NAV_GROUPS = [
       { to: '/records', icon: '📋', label: '정비 이력' },
       { to: '/products', icon: '🏭', label: '제품 정보' },
       { to: '/upload', icon: '📥', label: '엑셀 업로드' },
+      { to: '/reports', icon: '🗒️', label: '리포트' },
     ],
   },
   {
@@ -16,6 +17,7 @@ const NAV_GROUPS = [
       { to: '/dictionary', icon: '📖', label: '용어 사전', end: true },
       { to: '/dictionary/import', icon: '📑', label: '용어집 가져오기' },
       { to: '/equipment', icon: '🛠️', label: '설비 이력 조회' },
+      { to: '/inventory', icon: '📦', label: '재고 관리' },
       { to: '/audit', icon: '🔀', label: '자동병합 로그' },
     ],
   },

@@ -45,7 +45,8 @@ function RecordTable({ rows, showType = false }) {
 
 export function EquipmentHistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [name, setName] = useState(searchParams.get('name') || '');
+  const [search, setSearch] = useState('');
+  const [equipmentName, setEquipmentName] = useState('');
   const [history, setHistory] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -61,12 +62,12 @@ export function EquipmentHistoryPage() {
       .finally(() => setListLoading(false));
   }, []);
 
-  async function loadHistory(equipmentName) {
-    if (!equipmentName.trim()) return;
+  async function loadHistory(equipmentId, name) {
     setLoading(true);
     setError(null);
+    setEquipmentName(name);
     try {
-      const data = await equipmentApi.getHistory(equipmentName.trim());
+      const data = await equipmentApi.getHistory(equipmentId);
       setHistory(data);
     } catch (err) {
       setError(err.message);
@@ -76,39 +77,44 @@ export function EquipmentHistoryPage() {
   }
 
   useEffect(() => {
-    const initial = searchParams.get('name');
-    if (initial) loadHistory(initial);
+    const initialId = searchParams.get('id');
+    if (initialId) {
+      const match = equipmentList.find((e) => String(e.equipment_id) === initialId);
+      loadHistory(initialId, match?.equipment_name || '');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [equipmentList.length > 0]);
 
-  function handleSearch(e) {
-    e.preventDefault();
-    setSearchParams(name.trim() ? { name: name.trim() } : {});
-    loadHistory(name);
+  function selectEquipment(equipmentId, name) {
+    setSearchParams({ id: String(equipmentId) });
+    loadHistory(equipmentId, name);
   }
 
-  function selectEquipment(equipmentName) {
-    setName(equipmentName);
-    setSearchParams({ name: equipmentName });
-    loadHistory(equipmentName);
+  function backToList() {
+    setHistory(null);
+    setSearchParams({});
   }
+
+  const filteredList = search.trim()
+    ? equipmentList.filter((e) => e.equipment_name.toLowerCase().includes(search.trim().toLowerCase()))
+    : equipmentList;
 
   return (
     <div>
-      <form className="filter-row" onSubmit={handleSearch}>
+      <form className="filter-row" onSubmit={(e) => e.preventDefault()}>
         <input
-          placeholder="설비명을 입력하세요 (예: 3호기 펌프)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          placeholder="설비명으로 검색 (예: 펌프)"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
           style={{ minWidth: 260 }}
         />
-        <button className="btn btn-primary btn-sm" type="submit" disabled={loading}>
-          조회
-        </button>
         {history && (
-          <span className={`chip${grouped ? ' active' : ''}`} onClick={() => setGrouped((v) => !v)}>
-            카테고리별 그룹핑
-          </span>
+          <>
+            <button className="btn btn-secondary btn-sm" onClick={backToList}>← 목록으로</button>
+            <span className={`chip${grouped ? ' active' : ''}`} onClick={() => setGrouped((v) => !v)}>
+              카테고리별 그룹핑
+            </span>
+          </>
         )}
       </form>
 
@@ -119,12 +125,12 @@ export function EquipmentHistoryPage() {
         <div className="card">
           <div className="card-t">
             <span>설비 목록</span>
-            <small>{equipmentList.length}개</small>
+            <small>{filteredList.length}개</small>
           </div>
           {listLoading ? (
             <div className="text-muted">불러오는 중...</div>
-          ) : equipmentList.length === 0 ? (
-            <EmptyState>등록된 정비 이력이 없습니다.</EmptyState>
+          ) : filteredList.length === 0 ? (
+            <EmptyState>조건에 맞는 설비가 없습니다.</EmptyState>
           ) : (
             <div className="table-scroll">
               <table className="tbl">
@@ -139,15 +145,15 @@ export function EquipmentHistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {equipmentList.map((e) => (
-                    <tr key={e.equipment_name}>
+                  {filteredList.map((e) => (
+                    <tr key={e.equipment_id}>
                       <td>{e.equipment_name}</td>
                       <td className="mono">{e.total}</td>
                       <td className="mono">{e.breakdown_count}</td>
                       <td className="mono">{e.inspection_count}</td>
                       <td className="mono">{e.last_record_date}</td>
                       <td>
-                        <button className="btn btn-secondary btn-sm" onClick={() => selectEquipment(e.equipment_name)}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => selectEquipment(e.equipment_id, e.equipment_name)}>
                           이력 보기
                         </button>
                       </td>
@@ -163,11 +169,11 @@ export function EquipmentHistoryPage() {
       {history && !loading && (
         <div className="card">
           <div className="card-t">
-            <span>{name} 정비 이력</span>
+            <span>{equipmentName} 정비 이력</span>
             <small>{history.length}건</small>
           </div>
           {history.length === 0 ? (
-            <EmptyState>해당 설비명의 이력이 없습니다. 정확한 설비명인지 확인하세요.</EmptyState>
+            <EmptyState>해당 설비의 이력이 없습니다.</EmptyState>
           ) : grouped ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {CATEGORY_GROUPS.map(({ type, label }) => {

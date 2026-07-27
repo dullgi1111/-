@@ -9,6 +9,8 @@ import { DictionaryPage } from './pages/DictionaryPage';
 import { DictionaryImportPage } from './pages/DictionaryImportPage';
 import { EquipmentHistoryPage } from './pages/EquipmentHistoryPage';
 import { MergeAuditPage } from './pages/MergeAuditPage';
+import { InventoryPage } from './pages/InventoryPage';
+import { ReportPage } from './pages/ReportPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 function App() {
@@ -25,6 +27,8 @@ function App() {
             <Route path="/dictionary/import" element={<DictionaryImportPage />} />
             <Route path="/equipment" element={<EquipmentHistoryPage />} />
             <Route path="/audit" element={<MergeAuditPage />} />
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/reports" element={<ReportPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

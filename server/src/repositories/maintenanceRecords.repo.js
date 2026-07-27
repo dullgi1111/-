@@ -16,7 +16,7 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-async function list({ equipment, dateFrom, dateTo, month, maintenanceType, companySource, page = 1, limit = 50 } = {}) {
+async function list({ equipment, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
   const conditions = ['is_deleted = false'];
   const params = [];
   if (equipment) { params.push(`%${equipment}%`); conditions.push(`equipment_name ILIKE $${params.length}`); }
@@ -25,6 +25,7 @@ async function list({ equipment, dateFrom, dateTo, month, maintenanceType, compa
   if (month) { params.push(Number(month)); conditions.push(`EXTRACT(MONTH FROM record_date) = $${params.length}`); }
   if (maintenanceType) { params.push(maintenanceType); conditions.push(`maintenance_type = $${params.length}`); }
   if (companySource) { params.push(companySource); conditions.push(`company_source = $${params.length}`); }
+  if (needsTypeReview) { conditions.push(`type_confirmed = false`); }
   const offset = (page - 1) * limit;
   params.push(limit, offset);
   const { rows } = await pool.query(
@@ -34,7 +35,7 @@ async function list({ equipment, dateFrom, dateTo, month, maintenanceType, compa
   return rows;
 }
 
-async function profileForEquipment(equipmentName) {
+async function profileForEquipmentId(equipmentId) {
   const { rows } = await pool.query(
     `SELECT
        COUNT(*)::int AS total,
@@ -46,16 +47,16 @@ async function profileForEquipment(equipmentName) {
        COUNT(*) FILTER (WHERE maintenance_type = 'unknown')::int AS unknown_count,
        ARRAY_REMOVE(ARRAY_AGG(DISTINCT company_source), NULL) AS companies
      FROM maintenance_records
-     WHERE equipment_name = $1 AND is_deleted = false`,
-    [equipmentName]
+     WHERE equipment_id = $1 AND is_deleted = false`,
+    [equipmentId]
   );
   return rows[0];
 }
 
-async function historyForEquipment(equipmentName) {
+async function historyForEquipmentId(equipmentId) {
   const { rows } = await pool.query(
-    'SELECT * FROM maintenance_records WHERE equipment_name = $1 AND is_deleted = false ORDER BY record_date DESC',
-    [equipmentName]
+    'SELECT * FROM maintenance_records WHERE equipment_id = $1 AND is_deleted = false ORDER BY record_date DESC',
+    [equipmentId]
   );
   return rows;
 }
@@ -86,4 +87,4 @@ async function softDeleteAll() {
   return rowCount;
 }
 
-module.exports = { create, findById, list, profileForEquipment, historyForEquipment, update, softDelete, softDeleteAll };
+module.exports = { create, findById, list, profileForEquipmentId, historyForEquipmentId, update, softDelete, softDeleteAll };

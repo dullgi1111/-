@@ -211,3 +211,18 @@ textarea { resize: vertical; min-height: 60px; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media print {
+  .sidebar, .topbar, .no-print { display: none !important; }
+  .content { padding: 0 !important; overflow: visible !important; }
+  .card { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
+}
+
+@keyframes pulse-warn-bg {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: var(--warn-bg); }
+}
+.row-alert-pulse td { animation: pulse-warn-bg 1.3s ease-in-out infinite; box-shadow: inset 3px 0 0 var(--warn); }
+@media (prefers-reduced-motion: reduce) {
+  .row-alert-pulse td { animation: none; background-color: var(--warn-bg); }
+}

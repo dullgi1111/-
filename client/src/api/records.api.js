@@ -1,4 +1,4 @@
-import { get, del } from './client';
+import { get, post, del } from './client';
 
 export function listRecords(params = {}) {
   const cleaned = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''));
@@ -16,4 +16,8 @@ export function removeRecord(id) {
 
 export function removeAllRecords() {
   return del('/records/all');
+}
+
+export function confirmType(id, maintenanceType) {
+  return post(`/records/${id}/confirm-type`, { maintenanceType });
 }
