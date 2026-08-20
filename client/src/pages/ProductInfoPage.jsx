@@ -5,6 +5,9 @@ import { EmptyState } from '../components/EmptyState';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { useToast } from '../components/ToastProvider';
+import { useUndoableForm, handleUndoKeyDown } from '../hooks/useUndoableForm';
+import { UndoHint } from '../components/UndoHint';
+import { HelpButton, HelpSection } from '../components/HelpButton';
 
 const FIELD_LABELS = { symptom: '자주 발생하는 증상', action: '자주 수행된 조치', part: '자주 사용된 부품' };
 
@@ -48,10 +51,12 @@ export function ProductInfoPage() {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [editForm, setEditForm] = useState(null);
+  const editFormState = useUndoableForm(emptyForm());
+  const { values: editForm, setValue: setEditField, undo: undoEdit, resetAll: resetEditForm, replaceAll: loadEditForm, canUndo: canUndoEdit } = editFormState;
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState(emptyForm());
+  const createFormState = useUndoableForm(emptyForm());
+  const { values: createForm, setValue: setCreateField, undo: undoCreate, resetAll: resetCreateForm, canUndo: canUndoCreate } = createFormState;
   const [creating, setCreating] = useState(false);
   const highlight = searchParams.get('highlight');
   const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
@@ -80,7 +85,7 @@ export function ProductInfoPage() {
     try {
       const data = await equipmentApi.getDetail(id);
       setDetail(data);
-      setEditForm({
+      loadEditForm({
         equipmentName: data.equipment_name || '',
         modelNumber: data.model_number || '',
         manufacturer: data.manufacturer || '',
@@ -135,7 +140,7 @@ export function ProductInfoPage() {
       await equipmentApi.createEquipment(createForm);
       toast.success('제품을 등록했습니다');
       setShowCreate(false);
-      setCreateForm(emptyForm());
+      resetCreateForm();
       loadList();
     } catch (err) {
       toast.error(err.message);
@@ -157,8 +162,22 @@ export function ProductInfoPage() {
         {detail && editForm && (
           <>
             {detail.needs_review && (
-              <div className="hint">
-                시스템이 정비 이력에서 자동으로 발견한 설비명입니다. 아래 사양 정보를 확인/입력하고 저장하면 확인 완료로 표시됩니다.
+              <div className="hint" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>
+                  시스템이 정비 이력에서 자동으로 발견한 설비명입니다. 아래 사양 정보를 확인/입력하고 저장하면 확인 완료로 표시됩니다.
+                </span>
+                <HelpButton title="'확인 필요'는 왜 뜨나요?" width={440}>
+                  <HelpSection heading="정비 이력에서 자동으로 찾아낸 설비예요">
+                    엑셀 업로드 시 설비명이 처음 보는 이름이면, 시스템이 정비 이력을 처리하면서 자동으로
+                    새 설비로 등록합니다. 이때 모델명·제조사 같은 사양 정보는 원본 데이터에 없을 수 있어
+                    비어있는 채로 등록되고, "확인 필요" 상태가 됩니다.
+                  </HelpSection>
+                  <HelpSection heading="확인하려면">
+                    아래 사양 정보(모델명/제조사/설치일 등)를 실제 설비 정보에 맞게 채우고 "저장"을
+                    누르면 확인 완료로 바뀝니다. 사양 정보가 없다면 비워둔 채 저장만 해도 확인 완료로
+                    표시됩니다.
+                  </HelpSection>
+                </HelpButton>
               </div>
             )}
 
@@ -170,37 +189,42 @@ export function ProductInfoPage() {
                 </Link>
               </div>
 
-              <div className="form-grid">
-                <div className="field">
-                  <label>설비명</label>
-                  <input value={editForm.equipmentName} onChange={(e) => setEditForm({ ...editForm, equipmentName: e.target.value })} />
-                </div>
-                {SPEC_FIELDS.map((f) => (
-                  <div className="field" key={f.key}>
-                    <label>{f.label}</label>
-                    <input
-                      type={f.type || 'text'}
-                      value={editForm[f.key]}
-                      onChange={(e) => setEditForm({ ...editForm, [f.key]: e.target.value })}
-                    />
+              <div onKeyDown={(e) => handleUndoKeyDown(e, { undo: undoEdit, resetAll: resetEditForm })}>
+                <div className="form-grid">
+                  <div className="field">
+                    <label>설비명</label>
+                    <input value={editForm.equipmentName} onChange={(e) => setEditField('equipmentName', e.target.value)} />
                   </div>
-                ))}
+                  {SPEC_FIELDS.map((f) => (
+                    <div className="field" key={f.key}>
+                      <label>{f.label}</label>
+                      <input
+                        type={f.type || 'text'}
+                        value={editForm[f.key]}
+                        onChange={(e) => setEditField(f.key, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="field">
+                  <label>사양</label>
+                  <textarea
+                    value={editForm.spec}
+                    onChange={(e) => setEditField('spec', e.target.value)}
+                    placeholder="용량, 전압, 규격 등 자유 입력"
+                  />
+                </div>
+                <div className="field">
+                  <label>비고</label>
+                  <textarea value={editForm.notes} onChange={(e) => setEditField('notes', e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+                    {saving ? '저장 중...' : '저장'}
+                  </button>
+                  <UndoHint canUndo={canUndoEdit} />
+                </div>
               </div>
-              <div className="field">
-                <label>사양</label>
-                <textarea
-                  value={editForm.spec}
-                  onChange={(e) => setEditForm({ ...editForm, spec: e.target.value })}
-                  placeholder="용량, 전압, 규격 등 자유 입력"
-                />
-              </div>
-              <div className="field">
-                <label>비고</label>
-                <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
-              </div>
-              <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
-                {saving ? '저장 중...' : '저장'}
-              </button>
             </div>
 
             <div className="card">
@@ -321,13 +345,13 @@ export function ProductInfoPage() {
       </div>
 
       {showCreate && (
-        <Modal onClose={() => setShowCreate(false)} title="제품 등록" width={480}>
-          <form onSubmit={handleCreate}>
+        <Modal onClose={() => { setShowCreate(false); resetCreateForm(); }} title="제품 등록" width={480}>
+          <form onSubmit={handleCreate} onKeyDown={(e) => handleUndoKeyDown(e, { undo: undoCreate, resetAll: resetCreateForm })}>
             <div className="field">
               <label>설비명 *</label>
               <input
                 value={createForm.equipmentName}
-                onChange={(e) => setCreateForm({ ...createForm, equipmentName: e.target.value })}
+                onChange={(e) => setCreateField('equipmentName', e.target.value)}
                 required
               />
             </div>
@@ -337,17 +361,20 @@ export function ProductInfoPage() {
                 <input
                   type={f.type || 'text'}
                   value={createForm[f.key]}
-                  onChange={(e) => setCreateForm({ ...createForm, [f.key]: e.target.value })}
+                  onChange={(e) => setCreateField(f.key, e.target.value)}
                 />
               </div>
             ))}
             <div className="field">
               <label>사양</label>
-              <textarea value={createForm.spec} onChange={(e) => setCreateForm({ ...createForm, spec: e.target.value })} />
+              <textarea value={createForm.spec} onChange={(e) => setCreateField('spec', e.target.value)} />
             </div>
-            <button className="btn btn-primary btn-sm" type="submit" disabled={creating}>
-              {creating ? '등록 중...' : '등록'}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={creating}>
+                {creating ? '등록 중...' : '등록'}
+              </button>
+              <UndoHint canUndo={canUndoCreate} />
+            </div>
           </form>
         </Modal>
       )}

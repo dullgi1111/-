@@ -8,7 +8,7 @@ const dictionaryRoutes = require('./routes/dictionary.routes');
 const importsRoutes = require('./routes/imports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const settingsRoutes = require('./routes/settings.routes');
-const classificationRulesRoutes = require('./routes/classificationRules.routes');
+const maintenanceTypeMapRoutes = require('./routes/maintenanceTypeMap.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const inventoryRoutes = require('./routes/inventory.routes');
 
@@ -24,7 +24,7 @@ app.use('/api/dictionary', dictionaryRoutes);
 app.use('/api/imports', importsRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/classification-rules', classificationRulesRoutes);
+app.use('/api/maintenance-type-map', maintenanceTypeMapRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 

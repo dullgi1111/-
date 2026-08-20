@@ -3,6 +3,14 @@ const asyncHandler = require('../middleware/asyncHandler');
 const recordPipeline = require('../services/recordPipeline.service');
 const maintenanceRecordsRepo = require('../repositories/maintenanceRecords.repo');
 const recordTermLinksRepo = require('../repositories/recordTermLinks.repo');
+const activityLogRepo = require('../repositories/activityLog.repo');
+
+const MAINTENANCE_TYPE_LABELS = {
+  breakdown_repair: '고장수리',
+  preventive_inspection: '예방점검',
+  other: '기타',
+  unknown: '미상',
+};
 
 const MAINTENANCE_TYPES = ['breakdown_repair', 'preventive_inspection', 'other', 'unknown'];
 
@@ -77,6 +85,16 @@ const confirmType = asyncHandler(async (req, res) => {
     maintenance_type_source: 'manual',
     type_confirmed: true,
   });
+  if (record.maintenance_type !== maintenanceType) {
+    await activityLogRepo.log({
+      area: '정비 이력',
+      item: `${record.equipment_name} (${record.record_date}) · 정비유형`,
+      oldValue: MAINTENANCE_TYPE_LABELS[record.maintenance_type] || record.maintenance_type,
+      newValue: MAINTENANCE_TYPE_LABELS[maintenanceType] || maintenanceType,
+      note: '사람이 확인',
+      linkPath: `/records?recordId=${record.id}`,
+    });
+  }
   res.json({ data: updated });
 });
 

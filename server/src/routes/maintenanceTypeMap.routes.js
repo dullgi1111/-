@@ -1,5 +1,5 @@
 const express = require('express');
-const controller = require('../controllers/classificationRules.controller');
+const controller = require('../controllers/maintenanceTypeMap.controller');
 
 const router = express.Router();
 router.get('/', controller.list);

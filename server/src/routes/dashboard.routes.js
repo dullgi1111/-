@@ -8,5 +8,6 @@ router.get('/recent-merges', controller.recentMerges);
 router.get('/trends', controller.trends);
 router.get('/equipment-stats', controller.equipmentStats);
 router.get('/report', controller.report);
+router.get('/activity-log', controller.activityLog);
 
 module.exports = router;

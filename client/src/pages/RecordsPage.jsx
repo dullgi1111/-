@@ -6,6 +6,7 @@ import { MaintenanceTypeBadge, MatchTypeBadge, Badge } from '../components/Badge
 import { Modal } from '../components/Modal';
 import { downloadCsv } from '../utils/csvExport';
 import { useToast } from '../components/ToastProvider';
+import { HelpButton, HelpSection } from '../components/HelpButton';
 
 const TYPE_FILTERS = [
   { value: '', label: '전체' },
@@ -59,6 +60,10 @@ export function RecordsPage() {
   const [equipment, setEquipment] = useState('');
   const [maintenanceType, setMaintenanceType] = useState(searchParams.get('maintenanceType') || '');
   const [month, setMonth] = useState('');
+  const [dateRange, setDateRange] = useState({
+    dateFrom: searchParams.get('dateFrom') || '',
+    dateTo: searchParams.get('dateTo') || '',
+  });
   const [needsTypeReview, setNeedsTypeReview] = useState(searchParams.get('needsTypeReview') === 'true');
   const [viewData, setViewData] = useState(null);
   const [viewLoading, setViewLoading] = useState(false);
@@ -71,10 +76,24 @@ export function RecordsPage() {
     if (highlight) setAcknowledgedIds(new Set());
   }, [highlight]);
 
+  useEffect(() => {
+    const recordId = searchParams.get('recordId');
+    if (recordId) handleView(recordId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function load() {
     setLoading(true);
     recordsApi
-      .listRecords({ equipment, maintenanceType, month, needsTypeReview: needsTypeReview ? 'true' : undefined, limit: 100 })
+      .listRecords({
+        equipment,
+        maintenanceType,
+        month,
+        dateFrom: dateRange.dateFrom,
+        dateTo: dateRange.dateTo,
+        needsTypeReview: needsTypeReview ? 'true' : undefined,
+        limit: 100,
+      })
       .then(setRecords)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -83,7 +102,11 @@ export function RecordsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maintenanceType, month, needsTypeReview]);
+  }, [maintenanceType, month, dateRange, needsTypeReview]);
+
+  function clearDateRange() {
+    setDateRange({ dateFrom: '', dateTo: '' });
+  }
 
   function handleSearchSubmit(e) {
     e.preventDefault();
@@ -164,6 +187,11 @@ export function RecordsPage() {
         >
           분류 검토 필요
         </span>
+        {dateRange.dateFrom && (
+          <span className="chip active" style={{ marginLeft: 8 }} onClick={clearDateRange}>
+            기간: {dateRange.dateFrom} ~ {dateRange.dateTo} ✕
+          </span>
+        )}
       </div>
 
       <div className="card">
@@ -245,7 +273,22 @@ export function RecordsPage() {
                   <div className="mono">{viewData.record.record_date}</div>
                 </div>
                 <div>
-                  <div className="stat-label">유형</div>
+                  <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span>유형</span>
+                    {!viewData.record.type_confirmed && (
+                      <HelpButton title="'검토 필요'는 무슨 뜻인가요?" width={440}>
+                        <HelpSection heading="시스템이 추정한 값이에요">
+                          업로드된 원본 데이터에 정비유형이 명시돼 있지 않으면, 시스템이 증상/조치 내용을
+                          보고 "고장수리"인지 "예방점검"인지 자동으로 추정합니다. 추정이 틀릴 수 있어서
+                          사람이 한 번 확인하기 전까지 "검토 필요"로 표시됩니다.
+                        </HelpSection>
+                        <HelpSection heading="확인하려면">
+                          아래에 뜨는 "고장수리"/"예방점검"/"미상" 버튼 중 실제로 맞는 것을 누르면 확정되고
+                          배지가 사라집니다.
+                        </HelpSection>
+                      </HelpButton>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <MaintenanceTypeBadge type={viewData.record.maintenance_type} />
                     {!viewData.record.type_confirmed && <Badge variant="warn">검토 필요</Badge>}
@@ -291,7 +334,27 @@ export function RecordsPage() {
               )}
 
               <div className="card-t" style={{ marginTop: 4 }}>
-                <span>인식된 표준 용어</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  인식된 표준 용어
+                  <HelpButton title="매칭 방식이 뭔가요?" width={460}>
+                    <HelpSection heading="증상/조치/부품 문구를 표준 용어로 바꾸는 과정">
+                      원본 데이터의 문구(예: "베어링마모")를 시스템이 용어 사전과 대조해서 표준 용어로
+                      연결한 결과입니다. 이 표에서 매칭 방식 배지로 어떻게 연결됐는지 알 수 있습니다.
+                    </HelpSection>
+                    <HelpSection heading="정확일치">
+                      용어 사전에 등록된 표준 용어/별칭과 글자가 완전히 같아서 바로 연결된 경우입니다.
+                    </HelpSection>
+                    <HelpSection heading="자동병합">
+                      기존 용어와 표현이 비슷해서(유사도 기준 이상) 시스템이 사람 확인 없이 자동으로 같은
+                      용어의 별칭으로 합친 경우입니다. 잘못 합쳐졌다면 "자동병합 로그" 화면에서 되돌릴 수
+                      있습니다.
+                    </HelpSection>
+                    <HelpSection heading="신규발견">
+                      사전에 없는 새로운 표현이라 이번에 새 용어로 등록된 경우입니다. "검토 필요" 표시가
+                      붙으면 용어 사전에서 한 번 확인해주세요.
+                    </HelpSection>
+                  </HelpButton>
+                </span>
                 <small>{viewData.links.length}건</small>
               </div>
               {viewData.links.length === 0 ? (

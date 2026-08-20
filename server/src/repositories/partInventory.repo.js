@@ -20,6 +20,11 @@ async function list({ lowStockOnly } = {}) {
   return rows;
 }
 
+async function getByTermId(canonicalTermId) {
+  const { rows } = await pool.query('SELECT * FROM part_inventory WHERE canonical_term_id = $1', [canonicalTermId]);
+  return rows[0] || null;
+}
+
 async function upsert(canonicalTermId, { stockQuantity, unit, minStockAlert }) {
   const { rows } = await pool.query(
     `INSERT INTO part_inventory (canonical_term_id, stock_quantity, unit, min_stock_alert)
@@ -35,4 +40,4 @@ async function upsert(canonicalTermId, { stockQuantity, unit, minStockAlert }) {
   return rows[0];
 }
 
-module.exports = { list, upsert };
+module.exports = { list, getByTermId, upsert };

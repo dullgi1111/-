@@ -16,6 +16,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/dictionary', icon: '📖', label: '용어 사전', end: true },
       { to: '/dictionary/import', icon: '📑', label: '용어집 가져오기' },
+      { to: '/classification-map', icon: '🧭', label: '정비유형 판정표' },
       { to: '/equipment', icon: '🛠️', label: '설비 이력 조회' },
       { to: '/inventory', icon: '📦', label: '재고 관리' },
       { to: '/audit', icon: '🔀', label: '자동병합 로그' },
@@ -31,9 +32,9 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="brand-logo">정</div>
+        <div className="brand-logo">K</div>
         <div>
-          <div className="brand-name">설비정비 표준화</div>
+          <div className="brand-name">KEP 설비정비 표준화</div>
           <div className="brand-sub">Term Normalizer</div>
         </div>
       </div>

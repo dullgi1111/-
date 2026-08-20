@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import * as importsApi from '../api/imports.api';
 import { useToast } from '../components/ToastProvider';
+import { HelpButton, HelpSection } from '../components/HelpButton';
+import { guessMapping, SYSTEM_FIELD_HINTS } from '../utils/columnMapping';
+import { downloadCsv } from '../utils/csvExport';
 
 const SYSTEM_FIELDS = [
   { key: 'equipmentName', label: '설비명', required: true },
@@ -12,45 +15,22 @@ const SYSTEM_FIELDS = [
   { key: 'companySource', label: '등록 업체', required: false },
 ];
 
-// Ordered most-specific-first so e.g. "점검일자" wins over the generic "날짜" for recordDate.
-const SYSTEM_FIELD_HINTS = {
-  equipmentName: ['설비명', '기기명', '장비명', '설비', '기기'],
-  recordDate: ['점검일자', '정비일자', '작업일자', '일자', '날짜'],
-  maintenanceType: ['정비유형', '구분', '유형', '종류'],
-  symptomText: ['증상', '고장증상', '고장내용', '현상'],
-  actionText: ['조치내용', '조치사항', '수리내용', '작업내용', '조치'],
-  partText: ['부품명', '자재명', '부품', '자재'],
-  companySource: ['등록업체', '정비업체', '작업업체', '업체명', '업체'],
-};
-
-function guessMapping(detectedColumns) {
-  const guessed = {};
-  const used = new Set();
-  const trimmed = detectedColumns.map((c) => ({ raw: c, trimmed: c.trim() }));
-
-  for (const field of SYSTEM_FIELDS) {
-    const hints = SYSTEM_FIELD_HINTS[field.key] || [];
-    let match = null;
-    for (const hint of hints) {
-      const exact = trimmed.find((c) => !used.has(c.raw) && c.trimmed === hint);
-      if (exact) { match = exact.raw; break; }
-    }
-    if (!match) {
-      for (const hint of hints) {
-        const partial = trimmed.find((c) => !used.has(c.raw) && c.trimmed.includes(hint));
-        if (partial) { match = partial.raw; break; }
-      }
-    }
-    if (match) {
-      guessed[field.key] = match;
-      used.add(match);
-    }
-  }
-  return guessed;
-}
-
-const STEP_LABELS = ['파일 선택', '컬럼 매핑', '검토 및 커밋'];
+const STEP_LABELS = ['파일 선택', '미리보기 및 저장'];
 const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'];
+
+function downloadTemplate() {
+  const headers = SYSTEM_FIELDS.map((f) => ({ key: f.key, label: SYSTEM_FIELD_HINTS[f.key]?.[0] || f.label }));
+  const sampleRow = {
+    equipmentName: '1호기 컨베이어',
+    recordDate: '2026-01-15',
+    maintenanceType: '고장수리',
+    symptomText: '모터 과열',
+    actionText: '모터 교체',
+    partText: '구동모터',
+    companySource: 'KEP',
+  };
+  downloadCsv('업로드_표준양식.csv', headers, [sampleRow]);
+}
 
 export function UploadWizardPage() {
   const toast = useToast();
@@ -61,7 +41,6 @@ export function UploadWizardPage() {
   const [companySource, setCompanySource] = useState('');
   const [uploading, setUploading] = useState(false);
   const [batch, setBatch] = useState(null);
-  const [detectedColumns, setDetectedColumns] = useState([]);
   const [sampleRows, setSampleRows] = useState([]);
   const [mapping, setMapping] = useState({});
   const [committing, setCommitting] = useState(false);
@@ -69,7 +48,8 @@ export function UploadWizardPage() {
   const [errorRows, setErrorRows] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [autoMapped, setAutoMapped] = useState(false);
+  const [mappingConfidence, setMappingConfidence] = useState({});
+  const [mappingError, setMappingError] = useState(null);
 
   async function handleUpload() {
     if (files.length === 0) {
@@ -77,25 +57,33 @@ export function UploadWizardPage() {
       return;
     }
     setUploading(true);
+    setMappingError(null);
     const controller = new AbortController();
     uploadAbortRef.current = controller;
     try {
       const data = await importsApi.uploadFile(files, companySource, controller.signal);
-      setBatch({ id: data.batchId });
-      setDetectedColumns(data.detectedColumns);
-      setSampleRows(data.sampleRows);
-      const guessed = guessMapping(data.detectedColumns);
-      setMapping(guessed);
+      const { guessed, confidence } = guessMapping(data.detectedColumns, SYSTEM_FIELDS);
 
       const requiredMissing = SYSTEM_FIELDS.filter((f) => f.required && !guessed[f.key]);
       if (requiredMissing.length === 0) {
-        // Confident auto-mapping: skip the manual mapping screen entirely.
-        setAutoMapped(true);
+        setBatch({ id: data.batchId });
+        setSampleRows(data.sampleRows);
+        setMapping(guessed);
+        setMappingConfidence(confidence);
         toast.success('컬럼을 자동으로 인식했습니다');
         await submitMapping(data.batchId, guessed);
       } else {
-        setAutoMapped(false);
-        setStep(1);
+        // Can't confidently place the required columns, and there's no manual mapping
+        // screen to fall back to -- reject the upload and tell the user which
+        // recognizable header names to use instead, rather than asking them to map
+        // system-internal field names to their columns themselves.
+        try {
+          await importsApi.removeBatch(data.batchId);
+        } catch {
+          // batch may already be gone; ignore
+        }
+        setMappingError({ missingFields: requiredMissing, detectedColumns: data.detectedColumns });
+        toast.error('필수 항목(설비명/날짜)에 해당하는 컬럼을 찾지 못했습니다');
       }
     } catch (err) {
       if (err.name !== 'AbortError') toast.error(err.message);
@@ -124,7 +112,7 @@ export function UploadWizardPage() {
   async function submitMapping(batchId, mappingToUse) {
     try {
       await importsApi.setMapping(batchId, { companySource, columnMapping: mappingToUse });
-      setStep(2);
+      setStep(1);
       setAnalysisLoading(true);
       try {
         const stats = await importsApi.analyze(batchId);
@@ -137,16 +125,6 @@ export function UploadWizardPage() {
     } catch (err) {
       toast.error(err.message);
     }
-  }
-
-  async function handleSaveMapping() {
-    const missing = SYSTEM_FIELDS.filter((f) => f.required && !mapping[f.key]);
-    if (missing.length > 0) {
-      toast.error(`필수 필드를 매핑하세요: ${missing.map((f) => f.label).join(', ')}`);
-      return;
-    }
-    setAutoMapped(false);
-    await submitMapping(batch.id, mapping);
   }
 
   async function handleCommit() {
@@ -197,16 +175,20 @@ export function UploadWizardPage() {
     setStep(0);
     setFiles([]);
     setBatch(null);
-    setDetectedColumns([]);
     setSampleRows([]);
     setMapping({});
     setStatus(null);
     setErrorRows([]);
     setAnalysis(null);
     setAnalysisLoading(false);
-    setAutoMapped(false);
+    setMappingConfidence({});
+    setMappingError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
+
+  const fuzzyMatchedFields = SYSTEM_FIELDS
+    .filter((f) => mappingConfidence[f.key] === 'fuzzy')
+    .map((f) => f.label);
 
   return (
     <div>
@@ -223,7 +205,38 @@ export function UploadWizardPage() {
 
       {step === 0 && (
         <div className="card">
-          <div className="card-t">엑셀/CSV 파일 업로드</div>
+          <div className="card-t">
+            <span>엑셀/CSV 파일 업로드</span>
+            <span
+              className="text-muted"
+              style={{ fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={downloadTemplate}
+            >
+              표준 양식 다운로드
+            </span>
+          </div>
+
+          {mappingError && (
+            <div className="hint" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', borderColor: 'transparent', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                {mappingError.missingFields.map((f) => f.label).join(', ')} 컬럼을 찾지 못해 업로드하지 못했습니다.
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                파일의 컬럼 이름: {mappingError.detectedColumns.join(', ')}
+              </div>
+              <div>
+                {mappingError.missingFields.map((f) => (
+                  <div key={f.key}>
+                    {f.label}으로 인식되는 이름 예시: {(SYSTEM_FIELD_HINTS[f.key] || []).slice(0, 5).join(', ')}
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6 }}>
+                엑셀 파일의 헤더(첫 행)를 위 이름 중 하나로 바꾸거나, "표준 양식 다운로드"를 받아 그 형식에 맞춰 다시 올려주세요.
+              </div>
+            </div>
+          )}
+
           <div className="field">
             <label>파일 (.xlsx, .xls, .csv, 여러 개 선택 가능)</label>
             <input
@@ -243,7 +256,7 @@ export function UploadWizardPage() {
           )}
           <div className="field">
             <label>등록 업체 (선택)</label>
-            <input value={companySource} onChange={(e) => setCompanySource(e.target.value)} placeholder="예: OO정비업체" />
+            <input value={companySource} onChange={(e) => setCompanySource(e.target.value)} placeholder="예: KEP" />
           </div>
           <div className="flex-between">
             <button className="btn btn-primary" onClick={handleUpload} disabled={uploading}>
@@ -260,85 +273,66 @@ export function UploadWizardPage() {
 
       {step === 1 && (
         <div className="card">
-          <div className="card-t">
-            <span>컬럼 매핑</span>
-            <small>파일의 실제 컬럼을 시스템 필드에 연결하세요 ({sampleRows.length > 0 ? '여러 파일이 합쳐진 결과' : ''})</small>
+          <div className="card-t" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>미리보기 및 저장</span>
+            <HelpButton title="왜 미리보기 단계가 있나요?" width={480}>
+              <HelpSection heading="아직 저장되지 않았어요">
+                이 화면은 실제 저장 전에 결과를 미리 보여주는 단계입니다. 아래 숫자들은 지금 올린 파일을
+                시스템이 어떻게 처리할지 예측한 결과이고, "이대로 저장하기"를 누르기 전까지는 정비 이력
+                DB에 아무것도 반영되지 않습니다.
+              </HelpSection>
+              <HelpSection heading="숫자들이 뜻하는 것">
+                "사전과 정확히 일치"는 이미 등록된 표준 용어와 똑같은 표현, "자동 병합 예상"은 표현이
+                조금 다르지만 같은 용어로 자동 인식될 항목, "사전에 없는 새 표현"은 처음 보는 표현이라
+                저장 시 새 용어로 자동 등록될 항목입니다.
+              </HelpSection>
+              <HelpSection heading="틀린 것 같으면">
+                아래 미리보기 표에서 각 항목에 실제로 맞는 값이 들어갔는지 확인하세요. 잘못됐다면 저장하지
+                말고 "취소"를 누른 뒤, 엑셀 파일의 헤더(첫 행)를 알아보기 쉬운 이름으로 바꿔서 다시
+                올려주세요. 저장 후 문제를 발견해도 개별 항목은 정비 이력/제품 정보 화면에서 수정할 수
+                있습니다.
+              </HelpSection>
+            </HelpButton>
           </div>
-          <div className="form-grid" style={{ marginBottom: 14 }}>
-            {SYSTEM_FIELDS.map((field) => (
-              <div className="field" key={field.key}>
-                <label>
-                  {field.label}
-                  {field.required && ' *'}
-                </label>
-                <select
-                  value={mapping[field.key] || ''}
-                  onChange={(e) => setMapping((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                >
-                  <option value="">매핑 안 함</option>
-                  {detectedColumns.map((col) => (
-                    <option key={col} value={col}>
-                      {col}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-
-          <div className="card-t" style={{ marginTop: 4 }}>
-            <span>미리보기 (상위 {sampleRows.length}행)</span>
-            <a className="btn btn-secondary btn-sm" href={importsApi.exportUrl(batch.id)} download>
-              전체 데이터 내보내기
-            </a>
-          </div>
-          <div className="table-scroll" style={{ marginBottom: 14 }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  {SYSTEM_FIELDS.map((f) => (
-                    <th key={f.key}>{f.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sampleRows.map((row, idx) => (
-                  <tr key={idx}>
-                    {SYSTEM_FIELDS.map((f) => (
-                      <td key={f.key}>{mapping[f.key] ? row[mapping[f.key]] : <span className="text-muted">-</span>}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex-between">
-            <button className="btn btn-secondary" onClick={handleCancelBatch}>취소</button>
-            <button className="btn btn-primary" onClick={handleSaveMapping}>다음: 검토 및 커밋</button>
-          </div>
-        </div>
-      )}
-
-      {step === 2 && (
-        <div className="card">
-          <div className="card-t">검토 및 커밋</div>
           {!status && (
             <>
               <p className="text-muted" style={{ marginBottom: 14 }}>
-                커밋하면 전체 데이터를 분류·용어매칭 파이프라인에 태워 정비 이력 DB에 반영합니다.
+                아직 저장 전입니다. 아래 내용을 확인하고 이상이 없으면 "이대로 저장하기"를 눌러주세요.
               </p>
 
-              {autoMapped && (
+              {fuzzyMatchedFields.length > 0 && (
                 <div className="hint" style={{ marginBottom: 14 }}>
-                  컬럼을 자동으로 인식해서 매핑을 건너뛰었습니다.{' '}
-                  <span
-                    style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
-                    onClick={() => setStep(1)}
-                  >
-                    매핑 확인/수정
-                  </span>
+                  <strong>{fuzzyMatchedFields.join(', ')}</strong>은(는) 컬럼 이름이 비슷해서 추정으로 연결한
+                  항목입니다. 아래 미리보기 표에서 실제 값이 맞는지 한 번 확인해주세요.
                 </div>
               )}
+
+              <div className="card-t" style={{ marginTop: 4 }}>
+                <span>미리보기 (상위 {sampleRows.length}행)</span>
+                <a className="btn btn-secondary btn-sm" href={importsApi.exportUrl(batch.id)} download>
+                  전체 데이터 내보내기
+                </a>
+              </div>
+              <div className="table-scroll" style={{ marginBottom: 14 }}>
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      {SYSTEM_FIELDS.map((f) => (
+                        <th key={f.key}>{f.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sampleRows.map((row, idx) => (
+                      <tr key={idx}>
+                        {SYSTEM_FIELDS.map((f) => (
+                          <td key={f.key}>{mapping[f.key] ? row[mapping[f.key]] : <span className="text-muted">-</span>}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {analysisLoading && <div className="text-muted" style={{ marginBottom: 14 }}>사전과 대조 분석 중...</div>}
 
@@ -361,12 +355,12 @@ export function UploadWizardPage() {
                     <div className="stat" style={{ '--sc': 'var(--warn)' }}>
                       <div className="stat-label">사전에 없는 새 표현</div>
                       <div className="stat-num">{analysis.phrase.newDiscovery}</div>
-                      <div className="stat-sub">커밋 시 자동으로 사전에 추가됩니다</div>
+                      <div className="stat-sub">저장 시 자동으로 사전에 추가됩니다</div>
                     </div>
                   </div>
                   {analysis.missingRequiredCount > 0 && (
                     <div className="hint" style={{ background: 'var(--danger-bg)', color: 'var(--danger)', borderColor: 'transparent' }}>
-                      설비명 또는 날짜가 비어있는 행이 {analysis.missingRequiredCount}건 있습니다. 이 행들은 커밋 시 오류로
+                      설비명 또는 날짜가 비어있는 행이 {analysis.missingRequiredCount}건 있습니다. 이 행들은 저장 시 오류로
                       처리되어 저장되지 않습니다.
                     </div>
                   )}
@@ -381,7 +375,7 @@ export function UploadWizardPage() {
 
               <div className="flex-between">
                 <button className="btn btn-primary" onClick={handleCommit} disabled={committing}>
-                  커밋 시작
+                  이대로 저장하기
                 </button>
                 <button className="btn btn-secondary" onClick={handleCancelBatch}>취소</button>
               </div>

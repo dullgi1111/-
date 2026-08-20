@@ -1,5 +1,6 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const { pool } = require('../config/db');
+const activityLogRepo = require('../repositories/activityLog.repo');
 
 const summary = asyncHandler(async (req, res) => {
   const [
@@ -147,4 +148,13 @@ const report = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { summary, recentDiscoveries, recentMerges, trends, equipmentStats, report };
+const activityLog = asyncHandler(async (req, res) => {
+  const { area, page, limit } = req.query;
+  const [rows, summaryData] = await Promise.all([
+    activityLogRepo.list({ area, page: page ? Number(page) : undefined, limit: limit ? Number(limit) : 100 }),
+    activityLogRepo.summary(),
+  ]);
+  res.json({ data: { rows, summary: summaryData } });
+});
+
+module.exports = { summary, recentDiscoveries, recentMerges, trends, equipmentStats, report, activityLog };

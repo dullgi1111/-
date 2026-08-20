@@ -4,7 +4,6 @@ import { useToast } from '../components/ToastProvider';
 
 const SETTING_LABELS = {
   term_merge_threshold: '자동병합 유사도 임계값 (0~1)',
-  classification_min_confidence: '정비유형 분류 최소 신뢰도 (0~1)',
   trgm_candidate_prefilter: 'DB 후보 검색 사전필터 유사도 (0~1)',
   trgm_candidate_limit: 'DB 후보 검색 개수 상한',
 };

@@ -4,6 +4,83 @@ import * as inventoryApi from '../api/inventory.api';
 import { EmptyState } from '../components/EmptyState';
 import { Badge } from '../components/Badge';
 import { useToast } from '../components/ToastProvider';
+import { useUndoableForm, handleUndoKeyDown } from '../hooks/useUndoableForm';
+import { UndoHint } from '../components/UndoHint';
+
+function InventoryRow({ row, isPulsing, onAcknowledge, onSaved }) {
+  const toast = useToast();
+  const [saving, setSaving] = useState(false);
+  const { values: draft, setValue: setDraft, undo, resetAll, canUndo } = useUndoableForm({
+    stockQuantity: row.stock_quantity,
+    unit: row.unit,
+    minStockAlert: row.min_stock_alert ?? '',
+  });
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await inventoryApi.updateInventory(row.canonical_term_id, {
+        stockQuantity: Number(draft.stockQuantity) || 0,
+        unit: draft.unit || '개',
+        minStockAlert: draft.minStockAlert === '' ? null : Number(draft.minStockAlert),
+      });
+      toast.success('재고를 저장했습니다');
+      onSaved();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const isLow = row.min_stock_alert !== null && row.stock_quantity <= row.min_stock_alert;
+
+  return (
+    <tr
+      className={isPulsing ? 'row-alert-pulse' : ''}
+      onClick={onAcknowledge}
+      onKeyDown={(e) => handleUndoKeyDown(e, { undo, resetAll })}
+    >
+      <td>{row.canonical_text}</td>
+      <td className="mono">{row.occurrence_count}</td>
+      <td>
+        <input
+          type="number"
+          min="0"
+          style={{ width: 80 }}
+          value={draft.stockQuantity}
+          onChange={(e) => setDraft('stockQuantity', e.target.value)}
+        />
+      </td>
+      <td>
+        <input
+          style={{ width: 60 }}
+          value={draft.unit}
+          onChange={(e) => setDraft('unit', e.target.value)}
+        />
+      </td>
+      <td>
+        <input
+          type="number"
+          min="0"
+          style={{ width: 80 }}
+          placeholder="선택"
+          value={draft.minStockAlert}
+          onChange={(e) => setDraft('minStockAlert', e.target.value)}
+        />
+      </td>
+      <td>{isLow ? <Badge variant="danger">부족</Badge> : <Badge variant="ok">정상</Badge>}</td>
+      <td>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="btn btn-secondary btn-sm" disabled={saving} onClick={handleSave}>
+            저장
+          </button>
+          <UndoHint canUndo={canUndo} />
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export function InventoryPage() {
   const toast = useToast();
@@ -11,8 +88,6 @@ export function InventoryPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lowStockOnly, setLowStockOnly] = useState(searchParams.get('lowStockOnly') === 'true');
-  const [drafts, setDrafts] = useState({});
-  const [savingId, setSavingId] = useState(null);
   const highlight = searchParams.get('highlight');
   const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
 
@@ -24,13 +99,7 @@ export function InventoryPage() {
     setLoading(true);
     inventoryApi
       .listInventory({ lowStockOnly: lowStockOnly ? 'true' : undefined })
-      .then((data) => {
-        setRows(data);
-        setDrafts(Object.fromEntries(data.map((r) => [
-          r.canonical_term_id,
-          { stockQuantity: r.stock_quantity, unit: r.unit, minStockAlert: r.min_stock_alert ?? '' },
-        ])));
-      })
+      .then(setRows)
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
   }
@@ -39,28 +108,6 @@ export function InventoryPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lowStockOnly]);
-
-  function updateDraft(termId, field, value) {
-    setDrafts((prev) => ({ ...prev, [termId]: { ...prev[termId], [field]: value } }));
-  }
-
-  async function handleSave(termId) {
-    const draft = drafts[termId];
-    setSavingId(termId);
-    try {
-      await inventoryApi.updateInventory(termId, {
-        stockQuantity: Number(draft.stockQuantity) || 0,
-        unit: draft.unit || '개',
-        minStockAlert: draft.minStockAlert === '' ? null : Number(draft.minStockAlert),
-      });
-      toast.success('재고를 저장했습니다');
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSavingId(null);
-    }
-  }
 
   const lowStockCount = rows.filter((r) => r.min_stock_alert !== null && r.stock_quantity <= r.min_stock_alert).length;
 
@@ -99,57 +146,15 @@ export function InventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => {
-                  const draft = drafts[r.canonical_term_id] || {};
-                  const isLow = r.min_stock_alert !== null && r.stock_quantity <= r.min_stock_alert;
-                  const isPulsing = highlight && isLow && !acknowledgedIds.has(r.canonical_term_id);
-                  return (
-                    <tr
-                      key={r.canonical_term_id}
-                      className={isPulsing ? 'row-alert-pulse' : ''}
-                      onClick={() => setAcknowledgedIds((prev) => new Set(prev).add(r.canonical_term_id))}
-                    >
-                      <td>{r.canonical_text}</td>
-                      <td className="mono">{r.occurrence_count}</td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          style={{ width: 80 }}
-                          value={draft.stockQuantity ?? 0}
-                          onChange={(e) => updateDraft(r.canonical_term_id, 'stockQuantity', e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          style={{ width: 60 }}
-                          value={draft.unit ?? '개'}
-                          onChange={(e) => updateDraft(r.canonical_term_id, 'unit', e.target.value)}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          type="number"
-                          min="0"
-                          style={{ width: 80 }}
-                          placeholder="선택"
-                          value={draft.minStockAlert ?? ''}
-                          onChange={(e) => updateDraft(r.canonical_term_id, 'minStockAlert', e.target.value)}
-                        />
-                      </td>
-                      <td>{isLow ? <Badge variant="danger">부족</Badge> : <Badge variant="ok">정상</Badge>}</td>
-                      <td>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          disabled={savingId === r.canonical_term_id}
-                          onClick={() => handleSave(r.canonical_term_id)}
-                        >
-                          저장
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {rows.map((r) => (
+                  <InventoryRow
+                    key={r.canonical_term_id}
+                    row={r}
+                    isPulsing={highlight && r.min_stock_alert !== null && r.stock_quantity <= r.min_stock_alert && !acknowledgedIds.has(r.canonical_term_id)}
+                    onAcknowledge={() => setAcknowledgedIds((prev) => new Set(prev).add(r.canonical_term_id))}
+                    onSaved={load}
+                  />
+                ))}
               </tbody>
             </table>
           </div>

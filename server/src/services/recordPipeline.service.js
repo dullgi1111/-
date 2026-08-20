@@ -18,8 +18,6 @@ async function processRecord({
   enteredBy,
 }) {
   const classification = await classificationService.classify({
-    symptomText,
-    actionText,
     mappedRawValue: mappedMaintenanceTypeRawValue,
   });
 

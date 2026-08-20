@@ -4,14 +4,17 @@ import * as dashboardApi from '../api/dashboard.api';
 import * as recordsApi from '../api/records.api';
 import { StatCard } from '../components/StatCard';
 import { EmptyState } from '../components/EmptyState';
-import { TrendChart, TrendLegend } from '../components/TrendChart';
+import { TrendChart, TrendLegend, TYPE_COLORS, TYPE_LABELS } from '../components/TrendChart';
 import { LoadingHint } from '../components/LoadingHint';
 import { Modal } from '../components/Modal';
+import { HelpButton, HelpSection } from '../components/HelpButton';
 
 const TABS = [
-  { key: 'stats', label: '통계' },
+  { key: 'trend', label: '월별 정비 이력 추이' },
+  { key: 'equipmentStats', label: '설비별 통계' },
   { key: 'breakdowns', label: '최근 고장수리 이력' },
   { key: 'stale', label: '정비 안 된 지 오래된 설비' },
+  { key: 'activity', label: '변경기록' },
 ];
 
 const STALE_ALERT_DAYS = 30;
@@ -87,8 +90,29 @@ function AlertBell({ alerts, open, onToggle, onSelect }) {
               overflow: 'hidden',
             }}
           >
-            <div style={{ padding: '10px 14px', fontSize: 12.5, fontWeight: 700, borderBottom: '1px solid var(--border2)' }}>
-              알림 {alerts.length > 0 ? `${alerts.length}건` : ''}
+            <div
+              style={{
+                padding: '10px 14px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                borderBottom: '1px solid var(--border2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span>알림 {alerts.length > 0 ? `${alerts.length}건` : ''}</span>
+              <HelpButton title="알림벨과 깜빡이는 표시는 뭔가요?" width={460}>
+                <HelpSection heading="알림벨">
+                  재고 부족, 정비유형 검토 필요, 설비 확인 필요, 오래 정비 안 된 설비처럼 사람이 확인해야
+                  하는 항목이 있으면 종 모양 아이콘에 숫자가 뜹니다. 눌러서 목록을 보고, 항목을 선택하면
+                  해당 화면으로 바로 이동합니다.
+                </HelpSection>
+                <HelpSection heading="주황색으로 깜빡이는 행">
+                  알림을 눌러 이동하면 목록에서 그 항목의 행이 잠깐 주황색으로 깜빡입니다. 오류가 아니라
+                  "이게 알림이 가리킨 항목입니다"라는 표시이며, 그 행을 한 번 클릭하면 깜빡임이 멈춥니다.
+                </HelpSection>
+              </HelpButton>
             </div>
             {alerts.length === 0 ? (
               <div className="text-muted" style={{ padding: '18px 14px', fontSize: 12.5 }}>
@@ -143,10 +167,29 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedYear, setSelectedYear] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState(null);
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [showAlertDropdown, setShowAlertDropdown] = useState(false);
   const [highlightStale, setHighlightStale] = useState(false);
   const [acknowledgedStaleIds, setAcknowledgedStaleIds] = useState(new Set());
+  const [activityRows, setActivityRows] = useState([]);
+  const [activitySummary, setActivitySummary] = useState(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityLoaded, setActivityLoaded] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== 'activity' || activityLoaded) return;
+    setActivityLoading(true);
+    dashboardApi
+      .getActivityLog(100)
+      .then((data) => {
+        setActivityRows(data.rows);
+        setActivitySummary(data.summary);
+        setActivityLoaded(true);
+      })
+      .catch(() => {})
+      .finally(() => setActivityLoading(false));
+  }, [activeTab, activityLoaded]);
 
   useEffect(() => {
     Promise.all([
@@ -178,6 +221,25 @@ export function DashboardPage() {
     .sort((a, b) => new Date(a.last_record_date) - new Date(b.last_record_date))
     .slice(0, 15);
   const staleAlertCount = equipmentStats.filter((e) => (daysSince(e.last_record_date) ?? 0) > STALE_ALERT_DAYS).length;
+
+  const selectedMonthDetail = selectedMonth
+    ? (() => {
+        const monthRows = trends.filter((r) => r.month === selectedMonth);
+        const d = new Date(selectedMonth);
+        const monthStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+        // Avoid toISOString() here -- it converts to UTC, which in a timezone ahead of
+        // UTC (e.g. KST) rolls local midnight on the last day back to the previous day.
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        const monthEnd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        return {
+          label: `${d.getFullYear()}년 ${d.getMonth() + 1}월`,
+          total: monthRows.reduce((sum, r) => sum + r.count, 0),
+          byType: monthRows,
+          monthStart,
+          monthEnd,
+        };
+      })()
+    : null;
 
   const alerts = [
     {
@@ -257,6 +319,32 @@ export function DashboardPage() {
               확인하러 가기
             </button>
           </div>
+        </Modal>
+      )}
+
+      {selectedMonthDetail && (
+        <Modal onClose={() => setSelectedMonth(null)} title={selectedMonthDetail.label} width={420}>
+          <div style={{ fontSize: 13, color: 'var(--ink2)', marginBottom: 16 }}>
+            전체 <strong style={{ color: 'var(--ink)' }}>{selectedMonthDetail.total}건</strong>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+            {selectedMonthDetail.byType.map((r) => (
+              <div key={r.maintenance_type} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: TYPE_COLORS[r.maintenance_type] || 'var(--ink4)', flexShrink: 0 }} />
+                <span style={{ flex: 1, color: 'var(--ink2)' }}>{TYPE_LABELS[r.maintenance_type] || r.maintenance_type}</span>
+                <span className="mono" style={{ fontWeight: 700 }}>{r.count}건</span>
+              </div>
+            ))}
+          </div>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              navigate(`/records?dateFrom=${selectedMonthDetail.monthStart}&dateTo=${selectedMonthDetail.monthEnd}`);
+              setSelectedMonth(null);
+            }}
+          >
+            이 달의 정비 이력 보기 →
+          </button>
         </Modal>
       )}
 
@@ -349,78 +437,151 @@ export function DashboardPage() {
           </div>
         )}
 
-        {activeTab === 'stats' && (
-          <div>
-            <div className="card">
-              <div className="card-t">
-                <span>월별 정비 이력 추이</span>
-                <small>유형별 건수</small>
-              </div>
-              {trends.length === 0 ? (
-                <EmptyState>아직 표시할 정비 이력이 없습니다.</EmptyState>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                    {trendYears.map((y) => (
-                      <span
-                        key={y}
-                        className={`chip${y === selectedYear ? ' active' : ''}`}
-                        onClick={() => setSelectedYear(y)}
-                      >
-                        {y}년
-                      </span>
+        {activeTab === 'trend' && (
+          <div className="card">
+            <div className="card-t">
+              <span>월별 정비 이력 추이</span>
+              <small>유형별 건수</small>
+            </div>
+            {trends.length === 0 ? (
+              <EmptyState>아직 표시할 정비 이력이 없습니다.</EmptyState>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                  {trendYears.map((y) => (
+                    <span
+                      key={y}
+                      className={`chip${y === selectedYear ? ' active' : ''}`}
+                      onClick={() => setSelectedYear(y)}
+                    >
+                      {y}년
+                    </span>
+                  ))}
+                </div>
+                <div style={{ height: 260 }}>
+                  <TrendChart rows={yearTrends} onSelectMonth={setSelectedMonth} />
+                </div>
+                {yearTrends.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <TrendLegend rows={yearTrends} />
+                  </div>
+                )}
+                <div className="text-muted" style={{ fontSize: 11, marginTop: 6 }}>
+                  막대를 누르면 그 달의 상세 내역을 볼 수 있습니다.
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'equipmentStats' && (
+          <div className="card">
+            <div className="card-t">
+              <span>설비별 통계</span>
+              <small>{equipmentStats.length}개 설비</small>
+            </div>
+            {equipmentStats.length === 0 ? (
+              <EmptyState>아직 표시할 설비 이력이 없습니다.</EmptyState>
+            ) : (
+              <div className="table-scroll">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>설비명</th>
+                      <th>전체</th>
+                      <th>고장수리</th>
+                      <th>예방점검</th>
+                      <th>기타/미상</th>
+                      <th>최근 정비일</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {equipmentStats.map((e) => (
+                      <tr key={e.equipment_id}>
+                        <td>
+                          <Link to={`/equipment?id=${e.equipment_id}`}>{e.equipment_name}</Link>
+                        </td>
+                        <td className="mono">{e.total}</td>
+                        <td className="mono">{e.breakdown_count}</td>
+                        <td className="mono">{e.inspection_count}</td>
+                        <td className="mono">{e.other_count + e.unknown_count}</td>
+                        <td className="mono">{e.last_record_date}</td>
+                      </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div>
+            {activityLoading && !activityLoaded ? (
+              <div className="text-muted">불러오는 중...</div>
+            ) : (
+              <>
+                <div className="stat-row" style={{ marginBottom: 14 }}>
+                  <StatCard label="총 변경 건수" value={activitySummary?.totalCount ?? 0} color="var(--accent)" />
+                  <StatCard label="오늘 변경" value={activitySummary?.todayCount ?? 0} color="var(--ok)" />
+                  <StatCard
+                    label="가장 많이 바뀐 영역"
+                    value={activitySummary?.topArea?.area ?? '-'}
+                    sub={activitySummary?.topArea ? `${activitySummary.topArea.count}건` : undefined}
+                    color="var(--warn)"
+                  />
+                  <StatCard
+                    label="최근 변경"
+                    value={activitySummary?.latest ? new Date(activitySummary.latest.occurred_at).toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                    sub={activitySummary?.latest?.item}
+                    color="var(--purple)"
+                  />
+                </div>
+
+                <div className="card">
+                  <div className="card-t">
+                    <span>작업기록 · 변경기록</span>
+                    <small>재고·설비 정보·정비 유형을 직접 수정한 이력이 최신순으로 쌓입니다</small>
                   </div>
-                  <div style={{ height: 260 }}>
-                    <TrendChart rows={yearTrends} />
-                  </div>
-                  {yearTrends.length > 0 && (
-                    <div style={{ marginTop: 10 }}>
-                      <TrendLegend rows={yearTrends} />
+                  {activityRows.length === 0 ? (
+                    <EmptyState>아직 기록된 변경 내역이 없습니다.</EmptyState>
+                  ) : (
+                    <div className="table-scroll">
+                      <table className="tbl">
+                        <thead>
+                          <tr>
+                            <th>시각</th>
+                            <th>영역</th>
+                            <th>항목</th>
+                            <th>이전 값</th>
+                            <th>변경 값</th>
+                            <th>비고</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {activityRows.map((row) => (
+                            <tr
+                              key={row.id}
+                              style={row.link_path ? { cursor: 'pointer' } : undefined}
+                              onClick={() => row.link_path && navigate(row.link_path)}
+                            >
+                              <td className="mono">{new Date(row.occurred_at).toLocaleString('ko-KR')}</td>
+                              <td><span className="badge badge-neutral">{row.area}</span></td>
+                              <td>{row.item}</td>
+                              <td className="text-muted">{row.old_value ?? '-'}</td>
+                              <td style={{ fontWeight: 700 }}>{row.new_value ?? '-'}</td>
+                              <td className="text-muted">{row.note || ''}</td>
+                              <td>{row.link_path && <span className="text-muted" style={{ fontSize: 11 }}>이동 →</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   )}
-                </>
-              )}
-            </div>
-
-            <div className="card">
-              <div className="card-t">
-                <span>설비별 통계</span>
-                <small>{equipmentStats.length}개 설비</small>
-              </div>
-              {equipmentStats.length === 0 ? (
-                <EmptyState>아직 표시할 설비 이력이 없습니다.</EmptyState>
-              ) : (
-                <div className="table-scroll">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>설비명</th>
-                        <th>전체</th>
-                        <th>고장수리</th>
-                        <th>예방점검</th>
-                        <th>기타/미상</th>
-                        <th>최근 정비일</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {equipmentStats.map((e) => (
-                        <tr key={e.equipment_id}>
-                          <td>
-                            <Link to={`/equipment?id=${e.equipment_id}`}>{e.equipment_name}</Link>
-                          </td>
-                          <td className="mono">{e.total}</td>
-                          <td className="mono">{e.breakdown_count}</td>
-                          <td className="mono">{e.inspection_count}</td>
-                          <td className="mono">{e.other_count + e.unknown_count}</td>
-                          <td className="mono">{e.last_record_date}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>

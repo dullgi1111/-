@@ -15,10 +15,10 @@ export function ToastProvider({ children }) {
   }, []);
 
   const show = useCallback(
-    (message, type = 'default') => {
+    (message, type = 'default', duration = 3500) => {
       const id = ++idCounter;
       setToasts((prev) => [...prev, { id, message, type }]);
-      timers.current[id] = setTimeout(() => remove(id), 3500);
+      timers.current[id] = setTimeout(() => remove(id), duration);
     },
     [remove]
   );
@@ -26,7 +26,7 @@ export function ToastProvider({ children }) {
   const api = {
     success: (message) => show(message, 'success'),
     error: (message) => show(message, 'error'),
-    info: (message) => show(message, 'default'),
+    info: (message, duration) => show(message, 'default', duration),
   };
 
   return (

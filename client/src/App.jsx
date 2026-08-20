@@ -7,6 +7,7 @@ import { ProductInfoPage } from './pages/ProductInfoPage';
 import { UploadWizardPage } from './pages/UploadWizardPage';
 import { DictionaryPage } from './pages/DictionaryPage';
 import { DictionaryImportPage } from './pages/DictionaryImportPage';
+import { ClassificationMapPage } from './pages/ClassificationMapPage';
 import { EquipmentHistoryPage } from './pages/EquipmentHistoryPage';
 import { MergeAuditPage } from './pages/MergeAuditPage';
 import { InventoryPage } from './pages/InventoryPage';
@@ -25,6 +26,7 @@ function App() {
             <Route path="/upload" element={<UploadWizardPage />} />
             <Route path="/dictionary" element={<DictionaryPage />} />
             <Route path="/dictionary/import" element={<DictionaryImportPage />} />
+            <Route path="/classification-map" element={<ClassificationMapPage />} />
             <Route path="/equipment" element={<EquipmentHistoryPage />} />
             <Route path="/audit" element={<MergeAuditPage />} />
             <Route path="/inventory" element={<InventoryPage />} />

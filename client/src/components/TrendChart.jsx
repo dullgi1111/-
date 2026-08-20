@@ -1,11 +1,11 @@
-const TYPE_COLORS = {
+export const TYPE_COLORS = {
   breakdown_repair: 'var(--danger)',
   preventive_inspection: 'var(--ok)',
   other: 'var(--purple)',
   unknown: 'var(--ink4)',
 };
 
-const TYPE_LABELS = {
+export const TYPE_LABELS = {
   breakdown_repair: '고장수리',
   preventive_inspection: '예방점검',
   other: '기타',
@@ -32,7 +32,7 @@ export function TrendLegend({ rows }) {
 // thin to read regardless of layout, so trim instead of forcing a scroll.
 const MAX_MONTHS = 12;
 
-export function TrendChart({ rows }) {
+export function TrendChart({ rows, onSelectMonth }) {
   if (!rows || rows.length === 0) return null;
 
   const allMonths = [...new Set(rows.map((r) => r.month))].sort();
@@ -60,7 +60,14 @@ export function TrendChart({ rows }) {
           const x = gap + i * (barWidth + gap);
           let yOffset = chartHeight;
           return (
-            <g key={month}>
+            <g
+              key={month}
+              onClick={() => onSelectMonth?.(month)}
+              style={{ cursor: onSelectMonth ? 'pointer' : 'default' }}
+            >
+              {onSelectMonth && (
+                <rect x={x} y={0} width={barWidth} height={chartHeight} fill="transparent" />
+              )}
               {types.map((type) => {
                 const row = rows.find((r) => r.month === month && r.maintenance_type === type);
                 const count = row ? row.count : 0;

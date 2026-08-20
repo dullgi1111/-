@@ -5,6 +5,7 @@ import { useToast } from '../components/ToastProvider';
 import { EmptyState } from '../components/EmptyState';
 import { Badge, MaintenanceTypeBadge } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { HelpButton, HelpSection } from '../components/HelpButton';
 import { downloadCsv } from '../utils/csvExport';
 
 const TERM_TYPE_LABELS = { symptom: '증상', action: '조치', part: '부품' };
@@ -169,6 +170,18 @@ export function DictionaryPage() {
         <span className={`chip${needsReviewOnly ? ' active' : ''}`} onClick={toggleNeedsReview}>
           검토 필요만
         </span>
+        <HelpButton title="용어의 '검토 필요'는 무슨 뜻인가요?" width={460}>
+          <HelpSection heading="새로 발견됐거나, 자동으로 처리된 용어예요">
+            정비 이력을 업로드하면 시스템이 증상/조치/부품 문구를 용어 사전과 대조합니다. 사전에 없는
+            새 표현이거나, 기존 용어와 애매하게 비슷해서 자동 병합된 표현은 사람이 한 번 봐야 하므로
+            "검토 필요"로 표시됩니다.
+          </HelpSection>
+          <HelpSection heading="확인하려면">
+            용어를 눌러 상세 화면을 열고 정의·별칭·사용된 정비 이력을 확인한 뒤, 목록의 "검토 완료"
+            버튼을 누르면 됩니다. 표현 자체가 잘못됐다면(오탈자 등) 상세 화면의 "맞춤법 확인"으로 웹
+            검색 기반 교정을 받을 수 있습니다.
+          </HelpSection>
+        </HelpButton>
       </div>
 
       <div className="card">

@@ -4,7 +4,18 @@ const equipmentRepo = require('../repositories/equipment.repo');
 const equipmentAliasesRepo = require('../repositories/equipmentAliases.repo');
 const maintenanceRecordsRepo = require('../repositories/maintenanceRecords.repo');
 const recordTermLinksRepo = require('../repositories/recordTermLinks.repo');
+const activityLogRepo = require('../repositories/activityLog.repo');
 const { normalizeSpaced } = require('../utils/textNormalize');
+
+const FIELD_LABELS = {
+  equipment_name: '설비명',
+  model_number: '모델명',
+  manufacturer: '제조사',
+  spec: '사양',
+  install_date: '설치일',
+  location: '설치 위치',
+  notes: '비고',
+};
 
 const list = asyncHandler(async (req, res) => {
   const { needsReview, search, page, limit } = req.query;
@@ -67,8 +78,26 @@ const update = asyncHandler(async (req, res) => {
   if (req.body.location !== undefined) fields.location = req.body.location;
   if (req.body.notes !== undefined) fields.notes = req.body.notes;
   if (req.body.needsReview !== undefined) fields.needs_review = req.body.needsReview;
+
+  const before = await equipmentRepo.findById(req.params.id);
+  if (!before) return res.status(404).json({ error: { message: 'Equipment not found' } });
   const equipment = await equipmentRepo.update(req.params.id, fields);
-  if (!equipment) return res.status(404).json({ error: { message: 'Equipment not found' } });
+
+  for (const [key, label] of Object.entries(FIELD_LABELS)) {
+    if (!(key in fields)) continue;
+    const oldVal = before[key] ?? '';
+    const newVal = equipment[key] ?? '';
+    if (String(oldVal) !== String(newVal)) {
+      await activityLogRepo.log({
+        area: '제품 정보',
+        item: `${equipment.equipment_name} · ${label}`,
+        oldValue: oldVal === '' ? null : String(oldVal),
+        newValue: newVal === '' ? null : String(newVal),
+        linkPath: `/products?id=${equipment.id}`,
+      });
+    }
+  }
+
   res.json({ data: equipment });
 });
 
@@ -76,6 +105,13 @@ const remove = asyncHandler(async (req, res) => {
   const equipment = await equipmentRepo.findById(req.params.id);
   if (!equipment) return res.status(404).json({ error: { message: 'Equipment not found' } });
   await equipmentRepo.softDelete(req.params.id);
+  await activityLogRepo.log({
+    area: '제품 정보',
+    item: equipment.equipment_name,
+    oldValue: '등록됨',
+    newValue: '삭제됨',
+  });
+  // no linkPath -- the deleted equipment's detail page no longer resolves
   res.status(204).send();
 });
 
