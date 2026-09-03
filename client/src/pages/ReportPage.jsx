@@ -91,7 +91,7 @@ export function ReportPage() {
       } else if (format === 'word') {
         await exportReportWord(report, byType);
       } else {
-        await exportReportPdf('report-content', report);
+        await exportReportPdf(report, byType);
       }
       toast.success('내보내기가 완료되었습니다');
     } catch (err) {
@@ -159,7 +159,7 @@ export function ReportPage() {
       )}
 
       {report && !loading && (
-        <div id="report-content">
+        <div>
           <div className="card">
             <div className="card-t">
               <span>정비 리포트</span>
