@@ -2,103 +2,152 @@ import { useState } from 'react';
 import * as dashboardApi from '../api/dashboard.api';
 import { EmptyState } from '../components/EmptyState';
 import { StatCard } from '../components/StatCard';
+import { useToast } from '../components/ToastProvider';
+import { exportReportExcel, exportReportWord, exportReportPdf } from '../utils/reportExport';
 
-const MAINTENANCE_TYPE_LABELS = {
-  breakdown_repair: '고장수리',
-  preventive_inspection: '예방점검',
-  other: '기타',
-  unknown: '미상',
+const QUARTER_LABELS = {
+  1: '1분기 (1~3월)',
+  2: '2분기 (4~6월)',
+  3: '3분기 (7~9월)',
+  4: '4분기 (10~12월)',
 };
 
-function toDateStr(d) {
-  return d.toISOString().slice(0, 10);
-}
-
-function startOfWeek(d) {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // week starts Monday
-  date.setDate(date.getDate() + diff);
-  return date;
-}
-
-function presetRange(preset) {
-  const today = new Date();
-  if (preset === 'week') {
-    return { dateFrom: toDateStr(startOfWeek(today)), dateTo: toDateStr(today) };
-  }
-  if (preset === 'month') {
-    const start = new Date(today.getFullYear(), today.getMonth(), 1);
-    return { dateFrom: toDateStr(start), dateTo: toDateStr(today) };
-  }
-  if (preset === 'lastMonth') {
-    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-    const end = new Date(today.getFullYear(), today.getMonth(), 0);
-    return { dateFrom: toDateStr(start), dateTo: toDateStr(end) };
-  }
-  return { dateFrom: toDateStr(today), dateTo: toDateStr(today) };
-}
-
-const PRESETS = [
-  { value: 'week', label: '이번 주' },
-  { value: 'month', label: '이번 달' },
-  { value: 'lastMonth', label: '지난 달' },
+const EXPORT_FORMATS = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'word', label: 'Word' },
+  { value: 'excel', label: 'Excel' },
 ];
 
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function lastDayOfMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function monthRange(year, month) {
+  return {
+    dateFrom: `${year}-${pad2(month)}-01`,
+    dateTo: `${year}-${pad2(month)}-${pad2(lastDayOfMonth(year, month))}`,
+  };
+}
+
+function quarterRange(year, quarter) {
+  const startMonth = (quarter - 1) * 3 + 1;
+  const endMonth = startMonth + 2;
+  return {
+    dateFrom: `${year}-${pad2(startMonth)}-01`,
+    dateTo: `${year}-${pad2(endMonth)}-${pad2(lastDayOfMonth(year, endMonth))}`,
+  };
+}
+
+function currentYearOptions() {
+  const nowYear = new Date().getFullYear();
+  const years = [];
+  for (let y = nowYear; y >= nowYear - 5; y--) years.push(y);
+  return years;
+}
+
 export function ReportPage() {
-  const [preset, setPreset] = useState('month');
-  const [range, setRange] = useState(presetRange('month'));
+  const toast = useToast();
+  const now = new Date();
+  const [mode, setMode] = useState('month'); // 'month' | 'quarter'
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [quarter, setQuarter] = useState(Math.floor(now.getMonth() / 3) + 1);
+  const [format, setFormat] = useState('pdf');
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
 
-  function load(r) {
+  const years = currentYearOptions();
+
+  function currentRange() {
+    return mode === 'month' ? monthRange(year, month) : quarterRange(year, quarter);
+  }
+
+  function handleGenerate(e) {
+    e.preventDefault();
+    const range = currentRange();
     setLoading(true);
     setError(null);
     dashboardApi
-      .getReport(r.dateFrom, r.dateTo)
+      .getReport(range.dateFrom, range.dateTo)
       .then(setReport)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
-  function handlePreset(p) {
-    setPreset(p);
-    const r = presetRange(p);
-    setRange(r);
-    load(r);
-  }
-
-  function handleRangeChange(field, value) {
-    setPreset('custom');
-    setRange((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function handleGenerate(e) {
-    e.preventDefault();
-    load(range);
-  }
-
   const byType = Object.fromEntries((report?.byType || []).map((r) => [r.maintenance_type, r.count]));
+
+  async function handleExport() {
+    if (!report) return;
+    setExporting(true);
+    try {
+      if (format === 'excel') {
+        exportReportExcel(report, byType);
+      } else if (format === 'word') {
+        await exportReportWord(report, byType);
+      } else {
+        await exportReportPdf('report-content', report);
+      }
+      toast.success('내보내기가 완료되었습니다');
+    } catch (err) {
+      toast.error(err.message || '내보내기에 실패했습니다');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div>
       <form className="filter-row no-print" onSubmit={handleGenerate}>
         <div style={{ display: 'flex', gap: 6 }}>
-          {PRESETS.map((p) => (
-            <span key={p.value} className={`chip${preset === p.value ? ' active' : ''}`} onClick={() => handlePreset(p.value)}>
-              {p.label}
+          {[
+            { value: 'month', label: '월간' },
+            { value: 'quarter', label: '분기' },
+          ].map((m) => (
+            <span key={m.value} className={`chip${mode === m.value ? ' active' : ''}`} onClick={() => setMode(m.value)}>
+              {m.label}
             </span>
           ))}
         </div>
-        <input type="date" value={range.dateFrom} onChange={(e) => handleRangeChange('dateFrom', e.target.value)} />
-        <span className="text-muted">~</span>
-        <input type="date" value={range.dateTo} onChange={(e) => handleRangeChange('dateTo', e.target.value)} />
+
+        <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          {years.map((y) => (
+            <option key={y} value={y}>{y}년</option>
+          ))}
+        </select>
+
+        {mode === 'month' ? (
+          <select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>{m}월</option>
+            ))}
+          </select>
+        ) : (
+          <select value={quarter} onChange={(e) => setQuarter(Number(e.target.value))}>
+            {[1, 2, 3, 4].map((q) => (
+              <option key={q} value={q}>{QUARTER_LABELS[q]}</option>
+            ))}
+          </select>
+        )}
+
         <button className="btn btn-secondary btn-sm" type="submit">조회</button>
+
         {report && (
-          <button className="btn btn-primary btn-sm" type="button" onClick={() => window.print()} style={{ marginLeft: 'auto' }}>
-            인쇄 / PDF로 저장
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+            <select value={format} onChange={(e) => setFormat(e.target.value)}>
+              {EXPORT_FORMATS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+            <button className="btn btn-primary btn-sm" type="button" onClick={handleExport} disabled={exporting}>
+              {exporting ? '내보내는 중...' : '내보내기'}
+            </button>
+          </div>
         )}
       </form>
 
@@ -110,7 +159,7 @@ export function ReportPage() {
       )}
 
       {report && !loading && (
-        <div>
+        <div id="report-content">
           <div className="card">
             <div className="card-t">
               <span>정비 리포트</span>
