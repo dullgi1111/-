@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import kepLogo from '../assets/kep-logo.png';
 
 const NAV_GROUPS = [
   {
@@ -32,7 +33,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="brand-logo">K</div>
+        <img src={kepLogo} alt="KEP" className="brand-logo" />
         <div>
           <div className="brand-name">KEP 설비정비 표준화</div>
           <div className="brand-sub">Term Normalizer</div>
