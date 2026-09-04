@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { SplashScreen } from '../components/SplashScreen';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 const TITLES = {
   '/': '대시보드',
@@ -36,6 +37,7 @@ export function AppShell() {
       <div className="main">
         <div className="topbar">
           <div className="page-title">{resolveTitle(location.pathname)}</div>
+          <ThemeToggle />
         </div>
         <div className="content">
           <Outlet />
