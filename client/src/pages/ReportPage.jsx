@@ -87,6 +87,7 @@ export function ReportPage() {
   const [groupBy, setGroupBy] = useState('equipment_name');
   const [selectedLines, setSelectedLines] = useState([]);
   const [lineQuery, setLineQuery] = useState('');
+  const [lineDropdownOpen, setLineDropdownOpen] = useState(false);
   const [equipmentLines, setEquipmentLines] = useState([]);
 
   const years = currentYearOptions();
@@ -136,7 +137,7 @@ export function ReportPage() {
     setSelectedLines((prev) => prev.filter((l) => l !== line));
   }
 
-  const lineSuggestions = lineQuery.trim()
+  const lineSuggestions = lineDropdownOpen
     ? equipmentLines.filter(
         (l) => l.line.toLowerCase().includes(lineQuery.trim().toLowerCase()) && !selectedLines.includes(l.line)
       )
@@ -307,14 +308,17 @@ export function ReportPage() {
         <div className="field" style={{ position: 'relative' }}>
           <label>설비라인 (선택하지 않으면 전체, 여러 개 선택 가능)</label>
           <input
-            placeholder="설비라인 검색 후 선택 (예: P, LP, TS)"
+            placeholder="클릭하면 전체 목록, 입력하면 검색"
             value={lineQuery}
+            onFocus={() => setLineDropdownOpen(true)}
+            onBlur={() => setLineDropdownOpen(false)}
             onChange={(e) => setLineQuery(e.target.value)}
           />
           {lineSuggestions.length > 0 && (
             <div
               className="card"
               style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, marginTop: 4, padding: 6, maxHeight: 260, overflowY: 'auto' }}
+              onMouseDown={(e) => e.preventDefault()}
             >
               {lineSuggestions.map((l) => (
                 <div
