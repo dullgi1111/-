@@ -28,6 +28,26 @@ const TYPE_LABELS = {
   unknown: '미상',
 };
 
+// 정비 상세 내역 섹션에서 고를 수 있는 항목들. 앞의 5개(작업일자~수행반)가
+// KEP 계전팀 1차 피드백 반영 후 정비이력 화면의 기본 컬럼과 동일한 항목.
+export const DETAIL_FIELD_DEFS = [
+  { key: 'record_date', label: '작업일자', defaultOn: true },
+  { key: 'work_name', label: '작업명', defaultOn: true },
+  { key: 'work_content', label: '작업내용', defaultOn: true },
+  { key: 'symptom_text', label: '현상', defaultOn: true },
+  { key: 'work_team', label: '수행반', defaultOn: true },
+  { key: 'maintenance_type', label: '정비유형', defaultOn: false },
+  { key: 'action_text', label: '조치내용', defaultOn: false },
+  { key: 'part_text', label: '부품명', defaultOn: false },
+  { key: 'company_source', label: '등록업체', defaultOn: false },
+];
+
+export function formatDetailField(key, record) {
+  if (key === 'maintenance_type') return TYPE_LABELS[record.maintenance_type] || record.maintenance_type;
+  const value = record[key];
+  return value === null || value === undefined || value === '' ? '-' : value;
+}
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -58,7 +78,7 @@ function downloadBlob(blob, filename) {
 
 // ---------------- Excel ----------------
 
-export function exportReportExcel(report, byType) {
+export function exportReportExcel(report, byType, detail) {
   const wb = XLSX.utils.book_new();
 
   const summarySheet = XLSX.utils.aoa_to_sheet([
@@ -89,6 +109,16 @@ export function exportReportExcel(report, byType) {
   ]);
   partSheet['!cols'] = [{ wch: 22 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, partSheet, '부품 TOP10');
+
+  if (detail && detail.fieldKeys.length > 0) {
+    const headerLabels = detail.fieldKeys.map((k) => DETAIL_FIELD_DEFS.find((f) => f.key === k)?.label || k);
+    const detailSheet = XLSX.utils.aoa_to_sheet([
+      ['설비명', ...headerLabels],
+      ...detail.records.map((r) => [r.equipment_name, ...detail.fieldKeys.map((k) => formatDetailField(k, r))]),
+    ]);
+    detailSheet['!cols'] = [{ wch: 22 }, ...headerLabels.map(() => ({ wch: 24 }))];
+    XLSX.utils.book_append_sheet(wb, detailSheet, '상세 내역');
+  }
 
   XLSX.writeFile(wb, `정비리포트_${report.dateFrom}_${report.dateTo}.xlsx`);
 }
@@ -175,7 +205,7 @@ function docxApprovalTable() {
   });
 }
 
-export async function exportReportWord(report, byType) {
+export async function exportReportWord(report, byType, detail) {
   const children = [
     new Paragraph({ children: [new TextRun({ text: COMPANY_NAME, size: 20, color: '74809A' })] }),
     new Paragraph({ text: REPORT_TITLE, heading: HeadingLevel.HEADING1 }),
@@ -213,6 +243,26 @@ export async function exportReportWord(report, byType) {
     );
   } else {
     children.push(new Paragraph({ text: '이 기간에 사용된 부품 기록이 없습니다.' }));
+  }
+
+  if (detail && detail.fieldKeys.length > 0) {
+    children.push(new Paragraph({ text: '' }), new Paragraph({ text: '4. 정비 상세 내역', heading: HeadingLevel.HEADING2 }));
+    const scopeLine =
+      detail.equipmentFilter?.length > 0
+        ? `대상 설비: ${detail.equipmentFilter.map((e) => e.equipment_name).join(', ')}`
+        : '대상 설비: 전체';
+    children.push(new Paragraph({ text: `${scopeLine} · ${detail.records.length}건${detail.truncated ? ' (최대 건수 초과로 일부만 표시)' : ''}` }));
+    const headerLabels = detail.fieldKeys.map((k) => DETAIL_FIELD_DEFS.find((f) => f.key === k)?.label || k);
+    if (detail.records.length > 0) {
+      children.push(
+        docxTable(
+          ['설비명', ...headerLabels],
+          detail.records.map((r) => [r.equipment_name, ...detail.fieldKeys.map((k) => formatDetailField(k, r))])
+        )
+      );
+    } else {
+      children.push(new Paragraph({ text: '조건에 맞는 상세 내역이 없습니다.' }));
+    }
   }
 
   children.push(new Paragraph({ text: '' }), new Paragraph({ text: '' }), docxApprovalTable());
@@ -255,7 +305,7 @@ async function setupKoreanFont(doc) {
   doc.setFont('NanumGothic', 'normal');
 }
 
-export async function exportReportPdf(report, byType) {
+export async function exportReportPdf(report, byType, detail) {
   const doc = new jsPDF('p', 'mm', 'a4');
   await setupKoreanFont(doc);
 
@@ -342,7 +392,41 @@ export async function exportReportPdf(report, byType) {
     headStyles: { font: 'NanumGothic', fontStyle: 'bold', fillColor: [14, 138, 95], textColor: 255 },
     theme: 'grid',
   });
-  y = doc.lastAutoTable.finalY + 14;
+  y = doc.lastAutoTable.finalY + 9;
+
+  if (detail && detail.fieldKeys.length > 0) {
+    if (y > 240) {
+      doc.addPage();
+      y = 20;
+    }
+    sectionTitle('4. 정비 상세 내역');
+    doc.setFont('NanumGothic', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 108, 128);
+    const scopeLine =
+      detail.equipmentFilter?.length > 0
+        ? `대상 설비: ${detail.equipmentFilter.map((e) => e.equipment_name).join(', ')}`
+        : '대상 설비: 전체';
+    doc.text(`${scopeLine} · ${detail.records.length}건${detail.truncated ? ` (최대 ${detail.records.length}건까지 표시)` : ''}`, margin, y);
+    y += 5;
+
+    const headerLabels = detail.fieldKeys.map((k) => DETAIL_FIELD_DEFS.find((f) => f.key === k)?.label || k);
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [['설비명', ...headerLabels]],
+      body:
+        detail.records.length > 0
+          ? detail.records.map((r) => [r.equipment_name, ...detail.fieldKeys.map((k) => String(formatDetailField(k, r)))])
+          : [['조건에 맞는 상세 내역이 없습니다.', ...headerLabels.map(() => '')]],
+      styles: { font: 'NanumGothic', fontSize: 8.5, textColor: [40, 46, 60] },
+      headStyles: { font: 'NanumGothic', fontStyle: 'bold', fillColor: [59, 92, 168], textColor: 255 },
+      theme: 'grid',
+    });
+    y = doc.lastAutoTable.finalY + 14;
+  } else {
+    y += 5;
+  }
 
   const boxW = 28;
   const boxH = 18;

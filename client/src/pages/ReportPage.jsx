@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as dashboardApi from '../api/dashboard.api';
+import * as equipmentApi from '../api/equipment.api';
+import * as recordsApi from '../api/records.api';
 import { EmptyState } from '../components/EmptyState';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/ToastProvider';
-import { exportReportExcel, exportReportWord, exportReportPdf } from '../utils/reportExport';
+import { exportReportExcel, exportReportWord, exportReportPdf, DETAIL_FIELD_DEFS, formatDetailField } from '../utils/reportExport';
+
+const DETAIL_ROW_LIMIT = 1000;
 
 const QUARTER_LABELS = {
   1: '1분기 (1~3월)',
@@ -62,7 +66,52 @@ export function ReportPage() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
 
+  const [selectedEquipment, setSelectedEquipment] = useState([]);
+  const [equipmentQuery, setEquipmentQuery] = useState('');
+  const [equipmentSuggestions, setEquipmentSuggestions] = useState([]);
+  const [selectedFields, setSelectedFields] = useState(
+    Object.fromEntries(DETAIL_FIELD_DEFS.map((f) => [f.key, f.defaultOn]))
+  );
+  const [detailRecords, setDetailRecords] = useState(null);
+  const [detailTruncated, setDetailTruncated] = useState(false);
+
   const years = currentYearOptions();
+
+  useEffect(() => {
+    const q = equipmentQuery.trim();
+    if (!q) {
+      setEquipmentSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      equipmentApi
+        .listEquipment({ search: q, limit: 8 })
+        .then((rows) => {
+          if (!cancelled) setEquipmentSuggestions(rows.filter((r) => !selectedEquipment.some((s) => s.id === r.id)));
+        })
+        .catch(() => {});
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipmentQuery]);
+
+  function addEquipment(eq) {
+    setSelectedEquipment((prev) => [...prev, { id: eq.id, equipment_name: eq.equipment_name }]);
+    setEquipmentQuery('');
+    setEquipmentSuggestions([]);
+  }
+
+  function removeEquipment(id) {
+    setSelectedEquipment((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  function toggleField(key) {
+    setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
 
   function currentRange() {
     return mode === 'month' ? monthRange(year, month) : quarterRange(year, quarter);
@@ -73,25 +122,40 @@ export function ReportPage() {
     const range = currentRange();
     setLoading(true);
     setError(null);
-    dashboardApi
-      .getReport(range.dateFrom, range.dateTo)
-      .then(setReport)
+    setDetailRecords(null);
+    setDetailTruncated(false);
+    Promise.all([
+      dashboardApi.getReport(range.dateFrom, range.dateTo),
+      recordsApi.listRecords({
+        equipmentIds: selectedEquipment.length > 0 ? selectedEquipment.map((e) => e.id).join(',') : undefined,
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
+        limit: DETAIL_ROW_LIMIT,
+      }),
+    ])
+      .then(([reportData, records]) => {
+        setReport(reportData);
+        setDetailRecords(records.slice().reverse());
+        setDetailTruncated(records.length >= DETAIL_ROW_LIMIT);
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
 
   const byType = Object.fromEntries((report?.byType || []).map((r) => [r.maintenance_type, r.count]));
+  const activeFieldKeys = DETAIL_FIELD_DEFS.filter((f) => selectedFields[f.key]).map((f) => f.key);
 
   async function handleExport() {
     if (!report) return;
     setExporting(true);
     try {
+      const detail = { records: detailRecords || [], fieldKeys: activeFieldKeys, truncated: detailTruncated, equipmentFilter: selectedEquipment };
       if (format === 'excel') {
-        exportReportExcel(report, byType);
+        exportReportExcel(report, byType, detail);
       } else if (format === 'word') {
-        await exportReportWord(report, byType);
+        await exportReportWord(report, byType, detail);
       } else {
-        await exportReportPdf(report, byType);
+        await exportReportPdf(report, byType, detail);
       }
       toast.success('내보내기가 완료되었습니다');
     } catch (err) {
@@ -150,6 +214,57 @@ export function ReportPage() {
           </div>
         )}
       </form>
+
+      <div className="card no-print">
+        <div className="card-t"><span>상세 내역 옵션</span></div>
+
+        <div className="field" style={{ position: 'relative' }}>
+          <label>포함할 설비 (선택하지 않으면 전체 설비)</label>
+          <input
+            placeholder="설비명 검색 후 선택"
+            value={equipmentQuery}
+            onChange={(e) => setEquipmentQuery(e.target.value)}
+          />
+          {equipmentSuggestions.length > 0 && (
+            <div
+              className="card"
+              style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, marginTop: 4, padding: 6 }}
+            >
+              {equipmentSuggestions.map((eq) => (
+                <div
+                  key={eq.id}
+                  className="chip"
+                  style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}
+                  onClick={() => addEquipment(eq)}
+                >
+                  {eq.equipment_name}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {selectedEquipment.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+            {selectedEquipment.map((eq) => (
+              <span key={eq.id} className="chip active" onClick={() => removeEquipment(eq.id)}>
+                {eq.equipment_name} ✕
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="field">
+          <label>포함할 항목</label>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+            {DETAIL_FIELD_DEFS.map((f) => (
+              <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!selectedFields[f.key]} onChange={() => toggleField(f.key)} />
+                {f.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {loading && <div className="text-muted">불러오는 중...</div>}
       {error && <EmptyState>불러오지 못했습니다: {error}</EmptyState>}
@@ -224,6 +339,46 @@ export function ReportPage() {
                       <tr key={p.canonical_text}>
                         <td>{p.canonical_text}</td>
                         <td className="mono">{p.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-t">
+              <span>정비 상세 내역</span>
+              <small>
+                {selectedEquipment.length > 0
+                  ? `${selectedEquipment.map((e) => e.equipment_name).join(', ')} · `
+                  : '전체 설비 · '}
+                {detailRecords?.length || 0}건{detailTruncated ? ` (최대 ${DETAIL_ROW_LIMIT}건까지 표시, 초과분은 잘림)` : ''}
+              </small>
+            </div>
+            {!detailRecords || detailRecords.length === 0 ? (
+              <EmptyState>조건에 맞는 정비 상세 내역이 없습니다.</EmptyState>
+            ) : activeFieldKeys.length === 0 ? (
+              <EmptyState>"상세 내역 옵션"에서 포함할 항목을 하나 이상 선택하세요.</EmptyState>
+            ) : (
+              <div className="table-scroll">
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>설비명</th>
+                      {activeFieldKeys.map((key) => (
+                        <th key={key}>{DETAIL_FIELD_DEFS.find((f) => f.key === key)?.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailRecords.map((r) => (
+                      <tr key={r.id}>
+                        <td>{r.equipment_name}</td>
+                        {activeFieldKeys.map((key) => (
+                          <td key={key}>{formatDetailField(key, r)}</td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
