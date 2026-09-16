@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as dashboardApi from '../api/dashboard.api';
 import * as equipmentApi from '../api/equipment.api';
 import * as recordsApi from '../api/records.api';
@@ -80,6 +80,7 @@ export function ReportPage() {
   const [equipmentQuery, setEquipmentQuery] = useState('');
   const [equipmentSuggestions, setEquipmentSuggestions] = useState([]);
   const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
+  const equipmentInputRef = useRef(null);
   const [selectedFields, setSelectedFields] = useState(
     Object.fromEntries(DETAIL_FIELD_DEFS.map((f) => [f.key, f.defaultOn]))
   );
@@ -89,6 +90,7 @@ export function ReportPage() {
   const [selectedLines, setSelectedLines] = useState([]);
   const [lineQuery, setLineQuery] = useState('');
   const [lineDropdownOpen, setLineDropdownOpen] = useState(false);
+  const lineInputRef = useRef(null);
   const [equipmentLines, setEquipmentLines] = useState([]);
 
   const years = currentYearOptions();
@@ -270,14 +272,34 @@ export function ReportPage() {
 
         <div className="field" style={{ position: 'relative' }}>
           <label>포함할 설비 (선택하지 않으면 전체 설비)</label>
-          <input
-            placeholder="클릭하면 목록, 입력하면 검색"
-            value={equipmentQuery}
-            onFocus={() => setEquipmentDropdownOpen(true)}
-            onBlur={() => setEquipmentDropdownOpen(false)}
-            onChange={(e) => setEquipmentQuery(e.target.value)}
-          />
-          {equipmentSuggestions.length > 0 && (
+          <div style={{ position: 'relative' }}>
+            <input
+              ref={equipmentInputRef}
+              placeholder="클릭하면 목록, 입력하면 검색"
+              value={equipmentQuery}
+              onFocus={() => setEquipmentDropdownOpen(true)}
+              onBlur={() => setEquipmentDropdownOpen(false)}
+              onChange={(e) => setEquipmentQuery(e.target.value)}
+              style={{ paddingRight: 32 }}
+            />
+            {equipmentDropdownOpen && (
+              <button
+                type="button"
+                aria-label="닫기"
+                onClick={() => {
+                  setEquipmentDropdownOpen(false);
+                  equipmentInputRef.current?.blur();
+                }}
+                style={{
+                  position: 'absolute', top: '50%', right: 8, transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink3)', fontSize: 15, lineHeight: 1, padding: 4,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {equipmentDropdownOpen && equipmentSuggestions.length > 0 && (
             <div
               className="card"
               style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, marginTop: 4, padding: 6, maxHeight: 260, overflowY: 'auto' }}
@@ -308,13 +330,33 @@ export function ReportPage() {
 
         <div className="field" style={{ position: 'relative' }}>
           <label>설비라인 (선택하지 않으면 전체, 여러 개 선택 가능)</label>
-          <input
-            placeholder="클릭하면 전체 목록, 입력하면 검색"
-            value={lineQuery}
-            onFocus={() => setLineDropdownOpen(true)}
-            onBlur={() => setLineDropdownOpen(false)}
-            onChange={(e) => setLineQuery(e.target.value)}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              ref={lineInputRef}
+              placeholder="클릭하면 전체 목록, 입력하면 검색"
+              value={lineQuery}
+              onFocus={() => setLineDropdownOpen(true)}
+              onBlur={() => setLineDropdownOpen(false)}
+              onChange={(e) => setLineQuery(e.target.value)}
+              style={{ paddingRight: 32 }}
+            />
+            {lineDropdownOpen && (
+              <button
+                type="button"
+                aria-label="닫기"
+                onClick={() => {
+                  setLineDropdownOpen(false);
+                  lineInputRef.current?.blur();
+                }}
+                style={{
+                  position: 'absolute', top: '50%', right: 8, transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink3)', fontSize: 15, lineHeight: 1, padding: 4,
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
           {lineSuggestions.length > 0 && (
             <div
               className="card"
