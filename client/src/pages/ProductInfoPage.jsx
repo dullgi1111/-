@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import * as equipmentApi from '../api/equipment.api';
 import { EmptyState } from '../components/EmptyState';
@@ -60,6 +60,8 @@ export function ProductInfoPage() {
   const [creating, setCreating] = useState(false);
   const highlight = searchParams.get('highlight');
   const [acknowledgedIds, setAcknowledgedIds] = useState(new Set());
+  const masterFileInputRef = useRef(null);
+  const [masterImporting, setMasterImporting] = useState(false);
 
   useEffect(() => {
     if (highlight) setAcknowledgedIds(new Set());
@@ -132,13 +134,31 @@ export function ProductInfoPage() {
     }
   }
 
+  async function handleMasterFileSelected(e) {
+    const file = e.target.files?.[0];
+    if (masterFileInputRef.current) masterFileInputRef.current.value = '';
+    if (!file) return;
+    setMasterImporting(true);
+    try {
+      const result = await equipmentApi.importMasterFile(file);
+      toast.success(
+        `설비기본정보 적재 완료: 총 ${result.totalRows}행 · 반영 ${result.updated}건 (신규 ${result.created} · 기존연결 ${result.matched}) · 건너뜀 ${result.skipped} · 오류 ${result.errors}`
+      );
+      loadList();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setMasterImporting(false);
+    }
+  }
+
   async function handleCreate(e) {
     e.preventDefault();
     if (!createForm.equipmentName.trim()) return;
     setCreating(true);
     try {
       await equipmentApi.createEquipment(createForm);
-      toast.success('제품을 등록했습니다');
+      toast.success('설비를 등록했습니다');
       setShowCreate(false);
       resetCreateForm();
       loadList();
@@ -153,7 +173,7 @@ export function ProductInfoPage() {
     return (
       <div>
         <button className="btn btn-secondary btn-sm" onClick={backToList} style={{ marginBottom: 14 }}>
-          ← 제품 목록으로
+          ← 설비 목록으로
         </button>
 
         {detailLoading && <div className="text-muted">불러오는 중...</div>}
@@ -227,6 +247,38 @@ export function ProductInfoPage() {
               </div>
             </div>
 
+            {(detail.master_name || detail.function_type || detail.equipment_type || detail.section || detail.grade_label) && (
+              <div className="card">
+                <div className="card-t"><span>설비기본정보 (엑셀 적재)</span></div>
+                <div className="form-grid" style={{ marginBottom: 0 }}>
+                  <div>
+                    <div className="stat-label">설비명칭</div>
+                    <div>{detail.master_name || <span className="text-muted">-</span>}</div>
+                  </div>
+                  <div>
+                    <div className="stat-label">기능유형</div>
+                    <div>{detail.function_type || <span className="text-muted">-</span>}</div>
+                  </div>
+                  <div>
+                    <div className="stat-label">설비유형</div>
+                    <div>{detail.equipment_type || <span className="text-muted">-</span>}</div>
+                  </div>
+                  <div>
+                    <div className="stat-label">section</div>
+                    <div className="mono">{detail.section || <span className="text-muted">-</span>}</div>
+                  </div>
+                  <div>
+                    <div className="stat-label">설비등급</div>
+                    <div>{detail.grade_label || <span className="text-muted">-</span>}</div>
+                  </div>
+                  <div>
+                    <div className="stat-label">Item No</div>
+                    <div className="mono">{detail.item_no || <span className="text-muted">-</span>}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="card">
               <div className="card-t"><span>정비 현황</span></div>
               <div className="stat-row" style={{ marginBottom: 0 }}>
@@ -289,30 +341,46 @@ export function ProductInfoPage() {
         <span className={`chip${needsReviewOnly ? ' active' : ''}`} onClick={() => setNeedsReviewOnly((v) => !v)}>
           확인 필요만
         </span>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)} style={{ marginLeft: 'auto' }}>
-          + 제품 등록
+        <input
+          ref={masterFileInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          style={{ display: 'none' }}
+          onChange={handleMasterFileSelected}
+        />
+        <button
+          className="btn btn-secondary btn-sm"
+          style={{ marginLeft: 'auto' }}
+          disabled={masterImporting}
+          onClick={() => masterFileInputRef.current?.click()}
+        >
+          {masterImporting ? '적재 중...' : '설비기본정보 엑셀 업로드'}
+        </button>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
+          + 설비 등록
         </button>
       </div>
 
       <div className="card">
         <div className="card-t">
-          <span>제품 목록</span>
+          <span>설비 목록</span>
           <small>{equipmentList.length}개</small>
         </div>
         {listLoading ? (
           <div className="text-muted">불러오는 중...</div>
         ) : equipmentList.length === 0 ? (
-          <EmptyState>등록된 제품이 없습니다.</EmptyState>
+          <EmptyState>등록된 설비가 없습니다.</EmptyState>
         ) : (
           <div className="table-scroll">
             <table className="tbl">
               <thead>
                 <tr>
                   <th>설비명</th>
-                  <th>모델명</th>
-                  <th>제조사</th>
-                  <th>사용 횟수</th>
-                  <th>상태</th>
+                  <th>설비명칭</th>
+                  <th>기능유형</th>
+                  <th>설비유형</th>
+                  <th>section</th>
+                  <th>설비등급</th>
                   <th></th>
                 </tr>
               </thead>
@@ -325,11 +393,15 @@ export function ProductInfoPage() {
                       className={isPulsing ? 'row-alert-pulse' : ''}
                       onClick={() => setAcknowledgedIds((prev) => new Set(prev).add(e.id))}
                     >
-                      <td>{e.equipment_name}</td>
-                      <td>{e.model_number || <span className="text-muted">-</span>}</td>
-                      <td>{e.manufacturer || <span className="text-muted">-</span>}</td>
-                      <td className="mono">{e.occurrence_count}</td>
-                      <td>{e.needs_review ? <Badge variant="warn">확인 필요</Badge> : <Badge variant="ok">확인됨</Badge>}</td>
+                      <td>
+                        {e.equipment_name}
+                        {e.needs_review && <Badge variant="warn" style={{ marginLeft: 6 }}>확인 필요</Badge>}
+                      </td>
+                      <td>{e.master_name || <span className="text-muted">-</span>}</td>
+                      <td>{e.function_type || <span className="text-muted">-</span>}</td>
+                      <td>{e.equipment_type || <span className="text-muted">-</span>}</td>
+                      <td className="mono">{e.section || <span className="text-muted">-</span>}</td>
+                      <td>{e.grade_label || <span className="text-muted">-</span>}</td>
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => selectEquipment(e.id)}>
                           상세 보기
@@ -345,7 +417,7 @@ export function ProductInfoPage() {
       </div>
 
       {showCreate && (
-        <Modal onClose={() => { setShowCreate(false); resetCreateForm(); }} title="제품 등록" width={480}>
+        <Modal onClose={() => { setShowCreate(false); resetCreateForm(); }} title="설비 등록" width={480}>
           <form onSubmit={handleCreate} onKeyDown={(e) => handleUndoKeyDown(e, { undo: undoCreate, resetAll: resetCreateForm })}>
             <div className="field">
               <label>설비명 *</label>

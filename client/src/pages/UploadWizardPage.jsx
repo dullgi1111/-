@@ -7,10 +7,13 @@ import { downloadCsv } from '../utils/csvExport';
 
 const SYSTEM_FIELDS = [
   { key: 'equipmentName', label: '설비명', required: true },
-  { key: 'recordDate', label: '날짜', required: true },
+  { key: 'recordDate', label: '작업일자', required: true },
   { key: 'maintenanceType', label: '정비유형 (선택)', required: false },
-  { key: 'symptomText', label: '증상', required: false },
-  { key: 'actionText', label: '조치내용', required: false },
+  { key: 'workName', label: '작업명', required: false },
+  { key: 'workContent', label: '작업내용', required: false },
+  { key: 'workTeam', label: '수행반', required: false },
+  { key: 'symptomText', label: '현상', required: false },
+  { key: 'actionText', label: '조치', required: false },
   { key: 'partText', label: '부품명', required: false },
   { key: 'companySource', label: '등록 업체', required: false },
 ];
@@ -24,8 +27,11 @@ function downloadTemplate() {
     equipmentName: '1호기 컨베이어',
     recordDate: '2026-01-15',
     maintenanceType: '고장수리',
-    symptomText: '모터 과열',
-    actionText: '모터 교체',
+    workName: '컨베이어 모터 교체 작업',
+    workContent: '베어링 소음 발생으로 구동모터 교체',
+    workTeam: '기계/장치',
+    symptomText: '고장.결함.수명소진',
+    actionText: '설비/부품 교체',
     partText: '구동모터',
     companySource: 'KEP',
   };
@@ -289,7 +295,7 @@ export function UploadWizardPage() {
               <HelpSection heading="틀린 것 같으면">
                 아래 미리보기 표에서 각 항목에 실제로 맞는 값이 들어갔는지 확인하세요. 잘못됐다면 저장하지
                 말고 "취소"를 누른 뒤, 엑셀 파일의 헤더(첫 행)를 알아보기 쉬운 이름으로 바꿔서 다시
-                올려주세요. 저장 후 문제를 발견해도 개별 항목은 정비 이력/제품 정보 화면에서 수정할 수
+                올려주세요. 저장 후 문제를 발견해도 개별 항목은 정비 이력/설비 목록 화면에서 수정할 수
                 있습니다.
               </HelpSection>
             </HelpButton>

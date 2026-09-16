@@ -15,6 +15,9 @@ async function processRecord({
   symptomText,
   actionText,
   partText,
+  workName,
+  workContent,
+  workTeam,
   enteredBy,
 }) {
   const classification = await classificationService.classify({
@@ -39,6 +42,9 @@ async function processRecord({
     symptom_text: symptomText || null,
     action_text: actionText || null,
     part_text: partText || null,
+    work_name: workName || null,
+    work_content: workContent || null,
+    work_team: workTeam || null,
     entered_by: enteredBy || null,
   });
 

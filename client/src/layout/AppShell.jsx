@@ -7,7 +7,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 const TITLES = {
   '/': '대시보드',
   '/records': '정비 이력',
-  '/products': '제품 정보',
+  '/products': '설비 목록',
   '/upload': '엑셀 업로드',
   '/dictionary': '용어 사전',
   '/dictionary/import': '용어집 가져오기',

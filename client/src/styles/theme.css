@@ -237,6 +237,7 @@ textarea { resize: vertical; min-height: 60px; }
 
 .text-muted { color: var(--ink3); }
 .mono { font-variant-numeric: tabular-nums; }
+.ellipsis-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .spinner { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

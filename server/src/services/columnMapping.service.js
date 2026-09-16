@@ -1,5 +1,5 @@
 const REQUIRED_FIELDS = ['equipmentName', 'recordDate'];
-const SYSTEM_FIELDS = ['equipmentName', 'recordDate', 'maintenanceType', 'symptomText', 'actionText', 'partText', 'companySource'];
+const SYSTEM_FIELDS = ['equipmentName', 'recordDate', 'maintenanceType', 'symptomText', 'actionText', 'partText', 'companySource', 'workName', 'workContent', 'workTeam'];
 
 function validateMapping(mapping) {
   if (!mapping || typeof mapping !== 'object') {

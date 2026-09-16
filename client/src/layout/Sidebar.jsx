@@ -7,7 +7,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/', icon: '📊', label: '대시보드', end: true },
       { to: '/records', icon: '📋', label: '정비 이력' },
-      { to: '/products', icon: '🏭', label: '제품 정보' },
+      { to: '/products', icon: '🏭', label: '설비 목록' },
       { to: '/upload', icon: '📥', label: '엑셀 업로드' },
       { to: '/reports', icon: '🗒️', label: '리포트' },
     ],

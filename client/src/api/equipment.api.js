@@ -29,3 +29,9 @@ export function getHistory(equipmentId) {
 export function getDetail(equipmentId) {
   return get(`/equipment/${equipmentId}/detail`);
 }
+
+export function importMasterFile(file) {
+  const form = new FormData();
+  form.append('file', file);
+  return post('/equipment/import-master', form);
+}

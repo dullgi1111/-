@@ -22,6 +22,9 @@ const createRecordSchema = z.object({
   symptomText: z.string().optional(),
   actionText: z.string().optional(),
   partText: z.string().optional(),
+  workName: z.string().optional(),
+  workContent: z.string().optional(),
+  workTeam: z.string().optional(),
   enteredBy: z.string().optional(),
 });
 
@@ -35,6 +38,9 @@ const create = asyncHandler(async (req, res) => {
     symptomText: body.symptomText,
     actionText: body.actionText,
     partText: body.partText,
+    workName: body.workName,
+    workContent: body.workContent,
+    workTeam: body.workTeam,
     enteredBy: body.enteredBy || 'manual',
   });
   res.status(201).json({ data: { record, links } });

@@ -89,7 +89,7 @@ const update = asyncHandler(async (req, res) => {
     const newVal = equipment[key] ?? '';
     if (String(oldVal) !== String(newVal)) {
       await activityLogRepo.log({
-        area: '제품 정보',
+        area: '설비 목록',
         item: `${equipment.equipment_name} · ${label}`,
         oldValue: oldVal === '' ? null : String(oldVal),
         newValue: newVal === '' ? null : String(newVal),
@@ -106,7 +106,7 @@ const remove = asyncHandler(async (req, res) => {
   if (!equipment) return res.status(404).json({ error: { message: 'Equipment not found' } });
   await equipmentRepo.softDelete(req.params.id);
   await activityLogRepo.log({
-    area: '제품 정보',
+    area: '설비 목록',
     item: equipment.equipment_name,
     oldValue: '등록됨',
     newValue: '삭제됨',

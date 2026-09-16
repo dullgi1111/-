@@ -38,12 +38,11 @@ const FIELD_TYPE_LABELS = { symptom: '증상', action: '조치', part: '부품' 
 
 const CSV_HEADERS = [
   { key: 'equipment_name', label: '설비명' },
-  { key: 'record_date', label: '날짜' },
-  { key: 'maintenance_type', label: '유형' },
-  { key: 'symptom_text', label: '증상' },
-  { key: 'action_text', label: '조치내용' },
-  { key: 'part_text', label: '부품명' },
-  { key: 'company_source', label: '등록업체' },
+  { key: 'record_date', label: '작업일자' },
+  { key: 'work_name', label: '작업명' },
+  { key: 'work_content', label: '작업내용' },
+  { key: 'symptom_text', label: '현상' },
+  { key: 'work_team', label: '수행반' },
 ];
 
 function csvAccessor(row, key) {
@@ -220,11 +219,11 @@ export function RecordsPage() {
               <thead>
                 <tr>
                   <th>설비명</th>
-                  <th>날짜</th>
-                  {!maintenanceType && <th>유형</th>}
-                  <th>증상</th>
-                  <th>조치내용</th>
-                  <th>등록업체</th>
+                  <th>작업일자</th>
+                  <th>작업명</th>
+                  <th>작업내용</th>
+                  <th>현상</th>
+                  <th>수행반</th>
                   <th></th>
                 </tr>
               </thead>
@@ -239,10 +238,10 @@ export function RecordsPage() {
                     >
                       <td>{r.equipment_name}</td>
                       <td className="mono">{r.record_date}</td>
-                      {!maintenanceType && <td><MaintenanceTypeBadge type={r.maintenance_type} /></td>}
+                      <td className="ellipsis-cell" title={r.work_name || ''}>{r.work_name || <span className="text-muted">-</span>}</td>
+                      <td>{r.work_content || <span className="text-muted">-</span>}</td>
                       <td>{r.symptom_text || <span className="text-muted">-</span>}</td>
-                      <td>{r.action_text || <span className="text-muted">-</span>}</td>
-                      <td>{r.company_source || <span className="text-muted">-</span>}</td>
+                      <td>{r.work_team || <span className="text-muted">-</span>}</td>
                       <td>
                         <button className="btn btn-secondary btn-sm" onClick={() => handleView(r.id)}>
                           자세히
@@ -269,8 +268,12 @@ export function RecordsPage() {
                   <div style={{ fontWeight: 700 }}>{viewData.record.equipment_name}</div>
                 </div>
                 <div>
-                  <div className="stat-label">날짜</div>
+                  <div className="stat-label">작업일자</div>
                   <div className="mono">{viewData.record.record_date}</div>
+                </div>
+                <div>
+                  <div className="stat-label">수행반</div>
+                  <div>{viewData.record.work_team || <span className="text-muted">-</span>}</div>
                 </div>
                 <div>
                   <div className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -302,7 +305,15 @@ export function RecordsPage() {
 
               <div style={{ marginBottom: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div>
-                  <div className="stat-label">증상</div>
+                  <div className="stat-label">작업명</div>
+                  <div>{viewData.record.work_name || <span className="text-muted">-</span>}</div>
+                </div>
+                <div>
+                  <div className="stat-label">작업내용</div>
+                  <div>{viewData.record.work_content || <span className="text-muted">-</span>}</div>
+                </div>
+                <div>
+                  <div className="stat-label">현상</div>
                   <div>{viewData.record.symptom_text || <span className="text-muted">-</span>}</div>
                 </div>
                 <div>

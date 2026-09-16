@@ -15,7 +15,7 @@ async function list({ status, needsReview, search, page = 1, limit = 50 } = {}) 
   const offset = (page - 1) * limit;
   params.push(limit, offset);
   const { rows } = await pool.query(
-    `SELECT * FROM equipment ${where} ORDER BY equipment_name LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    `SELECT * FROM equipment ${where} ORDER BY grade_num NULLS LAST, equipment_name LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
   return rows;

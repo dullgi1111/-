@@ -18,12 +18,10 @@ function RecordTable({ rows, showType = false }) {
       <table className="tbl">
         <thead>
           <tr>
-            <th>날짜</th>
+            <th>작업일자</th>
             {showType && <th>유형</th>}
-            <th>증상</th>
-            <th>조치내용</th>
-            <th>부품</th>
-            <th>등록업체</th>
+            <th>작업명</th>
+            <th>작업내용</th>
           </tr>
         </thead>
         <tbody>
@@ -31,10 +29,8 @@ function RecordTable({ rows, showType = false }) {
             <tr key={r.id}>
               <td className="mono">{r.record_date}</td>
               {showType && <td><MaintenanceTypeBadge type={r.maintenance_type} /></td>}
-              <td>{r.symptom_text || <span className="text-muted">-</span>}</td>
-              <td>{r.action_text || <span className="text-muted">-</span>}</td>
-              <td>{r.part_text || <span className="text-muted">-</span>}</td>
-              <td>{r.company_source || <span className="text-muted">-</span>}</td>
+              <td className="ellipsis-cell" title={r.work_name || ''}>{r.work_name || <span className="text-muted">-</span>}</td>
+              <td>{r.work_content || <span className="text-muted">-</span>}</td>
             </tr>
           ))}
         </tbody>

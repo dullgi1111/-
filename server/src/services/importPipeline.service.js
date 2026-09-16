@@ -35,6 +35,9 @@ async function runPipeline(batchId) {
           symptomText: mapped.symptomText,
           actionText: mapped.actionText,
           partText: mapped.partText,
+          workName: mapped.workName,
+          workContent: mapped.workContent,
+          workTeam: mapped.workTeam,
           enteredBy: 'import',
         });
 
