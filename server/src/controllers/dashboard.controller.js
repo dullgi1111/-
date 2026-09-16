@@ -85,6 +85,22 @@ const equipmentStats = asyncHandler(async (req, res) => {
   res.json({ data: rows });
 });
 
+// 설비명 끝의 1~2글자 알파벳(예: "FF-3401P"의 "P", "LS-652LP"의 "LP")을 설비라인으로
+// 취급한다. KEP 원본 자료에 별도 컬럼이 없어 설비명 문자열에서 뽑아내는 값이라,
+// equipment 테이블에 저장하지 않고 매번 이 표현식으로 계산한다.
+const EQUIPMENT_LINE_EXPR = "substring(equipment_name from '[A-Za-z]{1,2}$')";
+
+const equipmentLines = asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT ${EQUIPMENT_LINE_EXPR} AS line, COUNT(*)::int AS count
+    FROM equipment
+    WHERE status != 'deprecated' AND ${EQUIPMENT_LINE_EXPR} IS NOT NULL
+    GROUP BY line
+    ORDER BY count DESC
+  `);
+  res.json({ data: rows });
+});
+
 // 집계 기준 드롭다운에서 고를 수 있는 값 -> 실제 컬럼 매핑. SQL 인젝션 방지를 위해
 // 화이트리스트에 있는 값만 컬럼명으로 사용한다 (req.query 값을 직접 보간하지 않음).
 const REPORT_GROUP_BY_COLUMNS = {
@@ -94,6 +110,7 @@ const REPORT_GROUP_BY_COLUMNS = {
   work_name: 'work_name',
   work_content: 'work_content',
   maintenance_type: 'maintenance_type',
+  equipment_line: EQUIPMENT_LINE_EXPR,
 };
 
 const report = asyncHandler(async (req, res) => {
@@ -170,4 +187,4 @@ const activityLog = asyncHandler(async (req, res) => {
   res.json({ data: { rows, summary: summaryData } });
 });
 
-module.exports = { summary, recentDiscoveries, recentMerges, trends, equipmentStats, report, activityLog };
+module.exports = { summary, recentDiscoveries, recentMerges, trends, equipmentStats, equipmentLines, report, activityLog };

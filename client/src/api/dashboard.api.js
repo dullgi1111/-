@@ -12,6 +12,10 @@ export function getEquipmentStats() {
   return get('/dashboard/equipment-stats');
 }
 
+export function getEquipmentLines() {
+  return get('/dashboard/equipment-lines');
+}
+
 export function getReport(dateFrom, dateTo, groupBy) {
   const qs = new URLSearchParams({ dateFrom, dateTo, ...(groupBy ? { groupBy } : {}) }).toString();
   return get(`/dashboard/report?${qs}`);

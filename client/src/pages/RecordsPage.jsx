@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import * as recordsApi from '../api/records.api';
+import * as dashboardApi from '../api/dashboard.api';
 import { EmptyState } from '../components/EmptyState';
 import { MaintenanceTypeBadge, MatchTypeBadge, Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
@@ -59,6 +60,8 @@ export function RecordsPage() {
   const [equipment, setEquipment] = useState('');
   const [maintenanceType, setMaintenanceType] = useState(searchParams.get('maintenanceType') || '');
   const [month, setMonth] = useState('');
+  const [equipmentLine, setEquipmentLine] = useState('');
+  const [equipmentLines, setEquipmentLines] = useState([]);
   const [dateRange, setDateRange] = useState({
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',
@@ -76,6 +79,10 @@ export function RecordsPage() {
   }, [highlight]);
 
   useEffect(() => {
+    dashboardApi.getEquipmentLines().then(setEquipmentLines).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     const recordId = searchParams.get('recordId');
     if (recordId) handleView(recordId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,6 +95,7 @@ export function RecordsPage() {
         equipment,
         maintenanceType,
         month,
+        equipmentLine,
         dateFrom: dateRange.dateFrom,
         dateTo: dateRange.dateTo,
         needsTypeReview: needsTypeReview ? 'true' : undefined,
@@ -101,7 +109,7 @@ export function RecordsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maintenanceType, month, dateRange, needsTypeReview]);
+  }, [maintenanceType, month, equipmentLine, dateRange, needsTypeReview]);
 
   function clearDateRange() {
     setDateRange({ dateFrom: '', dateTo: '' });
@@ -179,6 +187,16 @@ export function RecordsPage() {
             {f.label}
           </span>
         ))}
+        <select
+          value={equipmentLine}
+          onChange={(e) => setEquipmentLine(e.target.value)}
+          style={{ marginLeft: 8 }}
+        >
+          <option value="">설비라인 전체</option>
+          {equipmentLines.map((l) => (
+            <option key={l.line} value={l.line}>{l.line} ({l.count})</option>
+          ))}
+        </select>
         <span
           className={`chip${needsTypeReview ? ' active' : ''}`}
           style={{ marginLeft: 8 }}

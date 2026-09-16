@@ -16,11 +16,12 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-async function list({ equipment, equipmentIds, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
+async function list({ equipment, equipmentIds, equipmentLine, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
   const conditions = ['is_deleted = false'];
   const params = [];
   if (equipment) { params.push(`%${equipment}%`); conditions.push(`equipment_name ILIKE $${params.length}`); }
   if (equipmentIds && equipmentIds.length > 0) { params.push(equipmentIds); conditions.push(`equipment_id = ANY($${params.length})`); }
+  if (equipmentLine) { params.push(equipmentLine); conditions.push(`substring(equipment_name from '[A-Za-z]{1,2}$') = $${params.length}`); }
   if (dateFrom) { params.push(dateFrom); conditions.push(`record_date >= $${params.length}`); }
   if (dateTo) { params.push(dateTo); conditions.push(`record_date <= $${params.length}`); }
   if (month) { params.push(Number(month)); conditions.push(`EXTRACT(MONTH FROM record_date) = $${params.length}`); }

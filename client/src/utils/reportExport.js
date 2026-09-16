@@ -57,6 +57,7 @@ export const GROUP_BY_DEFS = [
   { key: 'work_name', label: '작업명' },
   { key: 'work_content', label: '작업내용' },
   { key: 'maintenance_type', label: '정비유형' },
+  { key: 'equipment_line', label: '설비라인' },
 ];
 
 export function groupByLabel(key) {
@@ -66,6 +67,19 @@ export function groupByLabel(key) {
 export function formatGroupValue(groupBy, value) {
   if (groupBy === 'maintenance_type') return TYPE_LABELS[value] || value;
   return value;
+}
+
+// "정비 상세 내역" 섹션 상단에 쓰는 "대상 설비: ..." 문구. 화면 카드, Word, PDF가
+// 같은 문구를 쓰도록 한 곳에 모아둔다.
+export function buildScopeLine(detail) {
+  const parts = [];
+  if (detail.equipmentFilter?.length > 0) {
+    parts.push(`설비: ${detail.equipmentFilter.map((e) => e.equipment_name).join(', ')}`);
+  }
+  if (detail.lineFilter) {
+    parts.push(`설비라인: ${detail.lineFilter}`);
+  }
+  return parts.length > 0 ? `대상 ${parts.join(' · ')}` : '대상 설비: 전체';
 }
 
 function todayStr() {
@@ -268,10 +282,7 @@ export async function exportReportWord(report, byType, detail) {
 
   if (detail && detail.fieldKeys.length > 0) {
     children.push(new Paragraph({ text: '' }), new Paragraph({ text: '4. 정비 상세 내역', heading: HeadingLevel.HEADING2 }));
-    const scopeLine =
-      detail.equipmentFilter?.length > 0
-        ? `대상 설비: ${detail.equipmentFilter.map((e) => e.equipment_name).join(', ')}`
-        : '대상 설비: 전체';
+    const scopeLine = buildScopeLine(detail);
     children.push(new Paragraph({ text: `${scopeLine} · ${detail.records.length}건${detail.truncated ? ' (최대 건수 초과로 일부만 표시)' : ''}` }));
     const headerLabels = detail.fieldKeys.map((k) => DETAIL_FIELD_DEFS.find((f) => f.key === k)?.label || k);
     if (detail.records.length > 0) {
@@ -424,10 +435,7 @@ export async function exportReportPdf(report, byType, detail) {
     doc.setFont('NanumGothic', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(100, 108, 128);
-    const scopeLine =
-      detail.equipmentFilter?.length > 0
-        ? `대상 설비: ${detail.equipmentFilter.map((e) => e.equipment_name).join(', ')}`
-        : '대상 설비: 전체';
+    const scopeLine = buildScopeLine(detail);
     doc.text(`${scopeLine} · ${detail.records.length}건${detail.truncated ? ` (최대 ${detail.records.length}건까지 표시)` : ''}`, margin, y);
     y += 5;
 

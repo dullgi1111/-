@@ -47,10 +47,11 @@ const create = asyncHandler(async (req, res) => {
 });
 
 const list = asyncHandler(async (req, res) => {
-  const { equipment, equipmentIds, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page, limit } = req.query;
+  const { equipment, equipmentIds, equipmentLine, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page, limit } = req.query;
   const rows = await maintenanceRecordsRepo.list({
     equipment,
     equipmentIds: equipmentIds ? equipmentIds.split(',').filter(Boolean) : undefined,
+    equipmentLine,
     dateFrom,
     dateTo,
     month,

@@ -14,6 +14,7 @@ import {
   GROUP_BY_DEFS,
   groupByLabel,
   formatGroupValue,
+  buildScopeLine,
 } from '../utils/reportExport';
 
 const DETAIL_ROW_LIMIT = 1000;
@@ -84,8 +85,14 @@ export function ReportPage() {
   const [detailRecords, setDetailRecords] = useState(null);
   const [detailTruncated, setDetailTruncated] = useState(false);
   const [groupBy, setGroupBy] = useState('equipment_name');
+  const [equipmentLine, setEquipmentLine] = useState('');
+  const [equipmentLines, setEquipmentLines] = useState([]);
 
   const years = currentYearOptions();
+
+  useEffect(() => {
+    dashboardApi.getEquipmentLines().then(setEquipmentLines).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const q = equipmentQuery.trim();
@@ -149,6 +156,7 @@ export function ReportPage() {
       dashboardApi.getReport(range.dateFrom, range.dateTo, groupBy),
       recordsApi.listRecords({
         equipmentIds: selectedEquipment.length > 0 ? selectedEquipment.map((e) => e.id).join(',') : undefined,
+        equipmentLine: equipmentLine || undefined,
         dateFrom: range.dateFrom,
         dateTo: range.dateTo,
         limit: DETAIL_ROW_LIMIT,
@@ -170,7 +178,13 @@ export function ReportPage() {
     if (!report) return;
     setExporting(true);
     try {
-      const detail = { records: detailRecords || [], fieldKeys: activeFieldKeys, truncated: detailTruncated, equipmentFilter: selectedEquipment };
+      const detail = {
+        records: detailRecords || [],
+        fieldKeys: activeFieldKeys,
+        truncated: detailTruncated,
+        equipmentFilter: selectedEquipment,
+        lineFilter: equipmentLine || null,
+      };
       if (format === 'excel') {
         exportReportExcel(report, byType, detail);
       } else if (format === 'word') {
@@ -273,6 +287,16 @@ export function ReportPage() {
             ))}
           </div>
         )}
+
+        <div className="field">
+          <label>설비라인 (선택하지 않으면 전체)</label>
+          <select value={equipmentLine} onChange={(e) => setEquipmentLine(e.target.value)}>
+            <option value="">전체</option>
+            {equipmentLines.map((l) => (
+              <option key={l.line} value={l.line}>{l.line} ({l.count})</option>
+            ))}
+          </select>
+        </div>
 
         <div className="field">
           <label>포함할 항목</label>
@@ -384,9 +408,7 @@ export function ReportPage() {
             <div className="card-t">
               <span>정비 상세 내역</span>
               <small>
-                {selectedEquipment.length > 0
-                  ? `${selectedEquipment.map((e) => e.equipment_name).join(', ')} · `
-                  : '전체 설비 · '}
+                {buildScopeLine({ equipmentFilter: selectedEquipment, lineFilter: equipmentLine || null })} ·{' '}
                 {detailRecords?.length || 0}건{detailTruncated ? ` (최대 ${DETAIL_ROW_LIMIT}건까지 표시, 초과분은 잘림)` : ''}
               </small>
             </div>
