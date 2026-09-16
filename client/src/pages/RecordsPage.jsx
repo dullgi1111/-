@@ -9,13 +9,6 @@ import { downloadCsv } from '../utils/csvExport';
 import { useToast } from '../components/ToastProvider';
 import { HelpButton, HelpSection } from '../components/HelpButton';
 
-const TYPE_FILTERS = [
-  { value: '', label: '전체' },
-  { value: 'breakdown_repair', label: '고장수리' },
-  { value: 'preventive_inspection', label: '예방점검' },
-  { value: 'unknown', label: '미상' },
-];
-
 const MONTH_FILTERS = [
   { value: '', label: '전체' },
   ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}월` })),
@@ -62,6 +55,10 @@ export function RecordsPage() {
   const [month, setMonth] = useState('');
   const [equipmentLine, setEquipmentLine] = useState('');
   const [equipmentLines, setEquipmentLines] = useState([]);
+  const [selectedSymptoms, setSelectedSymptoms] = useState([]);
+  const [symptomOptions, setSymptomOptions] = useState([]);
+  const [selectedTeams, setSelectedTeams] = useState([]);
+  const [teamOptions, setTeamOptions] = useState([]);
   const [dateRange, setDateRange] = useState({
     dateFrom: searchParams.get('dateFrom') || '',
     dateTo: searchParams.get('dateTo') || '',
@@ -80,7 +77,17 @@ export function RecordsPage() {
 
   useEffect(() => {
     dashboardApi.getEquipmentLines().then(setEquipmentLines).catch(() => {});
+    dashboardApi.getSymptomOptions().then(setSymptomOptions).catch(() => {});
+    dashboardApi.getWorkTeamOptions().then(setTeamOptions).catch(() => {});
   }, []);
+
+  function toggleSymptom(value) {
+    setSelectedSymptoms((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  }
+
+  function toggleTeam(value) {
+    setSelectedTeams((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  }
 
   useEffect(() => {
     const recordId = searchParams.get('recordId');
@@ -96,6 +103,8 @@ export function RecordsPage() {
         maintenanceType,
         month,
         equipmentLine,
+        symptomTexts: selectedSymptoms.length > 0 ? selectedSymptoms.join(',') : undefined,
+        workTeams: selectedTeams.length > 0 ? selectedTeams.join(',') : undefined,
         dateFrom: dateRange.dateFrom,
         dateTo: dateRange.dateTo,
         needsTypeReview: needsTypeReview ? 'true' : undefined,
@@ -109,7 +118,7 @@ export function RecordsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maintenanceType, month, equipmentLine, dateRange, needsTypeReview]);
+  }, [maintenanceType, month, equipmentLine, selectedSymptoms, selectedTeams, dateRange, needsTypeReview]);
 
   function clearDateRange() {
     setDateRange({ dateFrom: '', dateTo: '' });
@@ -164,18 +173,33 @@ export function RecordsPage() {
       <form className="filter-row" onSubmit={handleSearchSubmit}>
         <input placeholder="설비명 검색" value={equipment} onChange={(e) => setEquipment(e.target.value)} style={{ maxWidth: 220 }} />
         <button className="btn btn-secondary btn-sm" type="submit">검색</button>
-        <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
-          {TYPE_FILTERS.map((f) => (
-            <span
-              key={f.value}
-              className={`chip${maintenanceType === f.value ? ' active' : ''}`}
-              onClick={() => setMaintenanceType(f.value)}
-            >
-              {f.label}
-            </span>
-          ))}
-        </div>
       </form>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, alignItems: 'center' }}>
+        <span className="text-muted" style={{ fontSize: 11.5, marginRight: 2 }}>현상</span>
+        {symptomOptions.map((o) => (
+          <span
+            key={o.symptom_text}
+            className={`chip${selectedSymptoms.includes(o.symptom_text) ? ' active' : ''}`}
+            onClick={() => toggleSymptom(o.symptom_text)}
+          >
+            {o.symptom_text}
+          </span>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+        <span className="text-muted" style={{ fontSize: 11.5, marginRight: 2 }}>수행반</span>
+        {teamOptions.map((o) => (
+          <span
+            key={o.work_team}
+            className={`chip${selectedTeams.includes(o.work_team) ? ' active' : ''}`}
+            onClick={() => toggleTeam(o.work_team)}
+          >
+            {o.work_team}
+          </span>
+        ))}
+      </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
         {MONTH_FILTERS.map((f) => (

@@ -90,6 +90,28 @@ const equipmentStats = asyncHandler(async (req, res) => {
 // 뽑아내는 값이라, equipment 테이블에 저장하지 않고 매번 이 표현식으로 계산한다.
 const EQUIPMENT_LINE_EXPR = "substring(equipment_name from '[A-Za-z]+$')";
 
+const symptomOptions = asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT symptom_text, COUNT(*)::int AS count
+    FROM maintenance_records
+    WHERE is_deleted = false AND symptom_text IS NOT NULL
+    GROUP BY symptom_text
+    ORDER BY count DESC
+  `);
+  res.json({ data: rows });
+});
+
+const workTeamOptions = asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(`
+    SELECT work_team, COUNT(*)::int AS count
+    FROM maintenance_records
+    WHERE is_deleted = false AND work_team IS NOT NULL
+    GROUP BY work_team
+    ORDER BY count DESC
+  `);
+  res.json({ data: rows });
+});
+
 const equipmentLines = asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`
     SELECT ${EQUIPMENT_LINE_EXPR} AS line, COUNT(*)::int AS count
@@ -187,4 +209,15 @@ const activityLog = asyncHandler(async (req, res) => {
   res.json({ data: { rows, summary: summaryData } });
 });
 
-module.exports = { summary, recentDiscoveries, recentMerges, trends, equipmentStats, equipmentLines, report, activityLog };
+module.exports = {
+  summary,
+  recentDiscoveries,
+  recentMerges,
+  trends,
+  equipmentStats,
+  equipmentLines,
+  symptomOptions,
+  workTeamOptions,
+  report,
+  activityLog,
+};

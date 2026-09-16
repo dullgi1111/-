@@ -16,12 +16,14 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-async function list({ equipment, equipmentIds, equipmentLine, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
+async function list({ equipment, equipmentIds, equipmentLine, symptomTexts, workTeams, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
   const conditions = ['is_deleted = false'];
   const params = [];
   if (equipment) { params.push(`%${equipment}%`); conditions.push(`equipment_name ILIKE $${params.length}`); }
   if (equipmentIds && equipmentIds.length > 0) { params.push(equipmentIds); conditions.push(`equipment_id = ANY($${params.length})`); }
   if (equipmentLine) { params.push(equipmentLine); conditions.push(`substring(equipment_name from '[A-Za-z]+$') = $${params.length}`); }
+  if (symptomTexts && symptomTexts.length > 0) { params.push(symptomTexts); conditions.push(`symptom_text = ANY($${params.length})`); }
+  if (workTeams && workTeams.length > 0) { params.push(workTeams); conditions.push(`work_team = ANY($${params.length})`); }
   if (dateFrom) { params.push(dateFrom); conditions.push(`record_date >= $${params.length}`); }
   if (dateTo) { params.push(dateTo); conditions.push(`record_date <= $${params.length}`); }
   if (month) { params.push(Number(month)); conditions.push(`EXTRACT(MONTH FROM record_date) = $${params.length}`); }

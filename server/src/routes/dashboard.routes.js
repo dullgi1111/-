@@ -8,6 +8,8 @@ router.get('/recent-merges', controller.recentMerges);
 router.get('/trends', controller.trends);
 router.get('/equipment-stats', controller.equipmentStats);
 router.get('/equipment-lines', controller.equipmentLines);
+router.get('/symptom-options', controller.symptomOptions);
+router.get('/work-team-options', controller.workTeamOptions);
 router.get('/report', controller.report);
 router.get('/activity-log', controller.activityLog);
 

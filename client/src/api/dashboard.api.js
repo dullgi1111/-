@@ -16,6 +16,14 @@ export function getEquipmentLines() {
   return get('/dashboard/equipment-lines');
 }
 
+export function getSymptomOptions() {
+  return get('/dashboard/symptom-options');
+}
+
+export function getWorkTeamOptions() {
+  return get('/dashboard/work-team-options');
+}
+
 export function getReport(dateFrom, dateTo, groupBy) {
   const qs = new URLSearchParams({ dateFrom, dateTo, ...(groupBy ? { groupBy } : {}) }).toString();
   return get(`/dashboard/report?${qs}`);
