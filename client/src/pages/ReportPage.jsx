@@ -79,6 +79,7 @@ export function ReportPage() {
   const [selectedEquipment, setSelectedEquipment] = useState([]);
   const [equipmentQuery, setEquipmentQuery] = useState('');
   const [equipmentSuggestions, setEquipmentSuggestions] = useState([]);
+  const [equipmentDropdownOpen, setEquipmentDropdownOpen] = useState(false);
   const [selectedFields, setSelectedFields] = useState(
     Object.fromEntries(DETAIL_FIELD_DEFS.map((f) => [f.key, f.defaultOn]))
   );
@@ -97,31 +98,28 @@ export function ReportPage() {
   }, []);
 
   useEffect(() => {
+    if (!equipmentDropdownOpen) return undefined;
     const q = equipmentQuery.trim();
-    if (!q) {
-      setEquipmentSuggestions([]);
-      return;
-    }
     let cancelled = false;
     const timer = setTimeout(() => {
       equipmentApi
-        .listEquipment({ search: q, limit: 8 })
+        .listEquipment(q ? { search: q, limit: 20 } : { limit: 20 })
         .then((rows) => {
           if (!cancelled) setEquipmentSuggestions(rows.filter((r) => !selectedEquipment.some((s) => s.id === r.id)));
         })
         .catch(() => {});
-    }, 250);
+    }, q ? 250 : 0);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [equipmentQuery]);
+  }, [equipmentQuery, equipmentDropdownOpen]);
 
   function addEquipment(eq) {
     setSelectedEquipment((prev) => [...prev, { id: eq.id, equipment_name: eq.equipment_name }]);
     setEquipmentQuery('');
-    setEquipmentSuggestions([]);
+    setEquipmentSuggestions((prev) => prev.filter((r) => r.id !== eq.id));
   }
 
   function removeEquipment(id) {
@@ -273,14 +271,17 @@ export function ReportPage() {
         <div className="field" style={{ position: 'relative' }}>
           <label>포함할 설비 (선택하지 않으면 전체 설비)</label>
           <input
-            placeholder="설비명 검색 후 선택"
+            placeholder="클릭하면 목록, 입력하면 검색"
             value={equipmentQuery}
+            onFocus={() => setEquipmentDropdownOpen(true)}
+            onBlur={() => setEquipmentDropdownOpen(false)}
             onChange={(e) => setEquipmentQuery(e.target.value)}
           />
           {equipmentSuggestions.length > 0 && (
             <div
               className="card"
-              style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, marginTop: 4, padding: 6 }}
+              style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, marginTop: 4, padding: 6, maxHeight: 260, overflowY: 'auto' }}
+              onMouseDown={(e) => e.preventDefault()}
             >
               {equipmentSuggestions.map((eq) => (
                 <div
