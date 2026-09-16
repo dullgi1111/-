@@ -21,7 +21,7 @@ async function list({ equipment, equipmentIds, equipmentLine, dateFrom, dateTo, 
   const params = [];
   if (equipment) { params.push(`%${equipment}%`); conditions.push(`equipment_name ILIKE $${params.length}`); }
   if (equipmentIds && equipmentIds.length > 0) { params.push(equipmentIds); conditions.push(`equipment_id = ANY($${params.length})`); }
-  if (equipmentLine) { params.push(equipmentLine); conditions.push(`substring(equipment_name from '[A-Za-z]{1,2}$') = $${params.length}`); }
+  if (equipmentLine) { params.push(equipmentLine); conditions.push(`substring(equipment_name from '[A-Za-z]+$') = $${params.length}`); }
   if (dateFrom) { params.push(dateFrom); conditions.push(`record_date >= $${params.length}`); }
   if (dateTo) { params.push(dateTo); conditions.push(`record_date <= $${params.length}`); }
   if (month) { params.push(Number(month)); conditions.push(`EXTRACT(MONTH FROM record_date) = $${params.length}`); }
@@ -31,7 +31,7 @@ async function list({ equipment, equipmentIds, equipmentLine, dateFrom, dateTo, 
   const offset = (page - 1) * limit;
   params.push(limit, offset);
   const { rows } = await pool.query(
-    `SELECT *, substring(equipment_name from '[A-Za-z]{1,2}$') AS equipment_line
+    `SELECT *, substring(equipment_name from '[A-Za-z]+$') AS equipment_line
      FROM maintenance_records WHERE ${conditions.join(' AND ')}
      ORDER BY record_date DESC, id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params

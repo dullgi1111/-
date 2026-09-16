@@ -85,10 +85,10 @@ const equipmentStats = asyncHandler(async (req, res) => {
   res.json({ data: rows });
 });
 
-// 설비명 끝의 1~2글자 알파벳(예: "FF-3401P"의 "P", "LS-652LP"의 "LP")을 설비라인으로
-// 취급한다. KEP 원본 자료에 별도 컬럼이 없어 설비명 문자열에서 뽑아내는 값이라,
-// equipment 테이블에 저장하지 않고 매번 이 표현식으로 계산한다.
-const EQUIPMENT_LINE_EXPR = "substring(equipment_name from '[A-Za-z]{1,2}$')";
+// 설비명 끝의 연속된 알파벳(예: "FF-3401P"의 "P", "LS-652LP"의 "LP", "SL23PLS"의
+// "PLS")을 설비라인으로 취급한다. KEP 원본 자료에 별도 컬럼이 없어 설비명 문자열에서
+// 뽑아내는 값이라, equipment 테이블에 저장하지 않고 매번 이 표현식으로 계산한다.
+const EQUIPMENT_LINE_EXPR = "substring(equipment_name from '[A-Za-z]+$')";
 
 const equipmentLines = asyncHandler(async (req, res) => {
   const { rows } = await pool.query(`
