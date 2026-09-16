@@ -275,7 +275,7 @@ export function ReportPage() {
           <div style={{ position: 'relative' }}>
             <input
               ref={equipmentInputRef}
-              placeholder="클릭하면 목록, 입력하면 검색"
+              placeholder="클릭: 목록 · 입력: 검색"
               value={equipmentQuery}
               onFocus={() => setEquipmentDropdownOpen(true)}
               onBlur={() => setEquipmentDropdownOpen(false)}
@@ -333,7 +333,7 @@ export function ReportPage() {
           <div style={{ position: 'relative' }}>
             <input
               ref={lineInputRef}
-              placeholder="클릭하면 전체 목록, 입력하면 검색"
+              placeholder="클릭: 목록 · 입력: 검색"
               value={lineQuery}
               onFocus={() => setLineDropdownOpen(true)}
               onBlur={() => setLineDropdownOpen(false)}
