@@ -12,8 +12,9 @@ export function getEquipmentStats() {
   return get('/dashboard/equipment-stats');
 }
 
-export function getReport(dateFrom, dateTo) {
-  return get(`/dashboard/report?dateFrom=${dateFrom}&dateTo=${dateTo}`);
+export function getReport(dateFrom, dateTo, groupBy) {
+  const qs = new URLSearchParams({ dateFrom, dateTo, ...(groupBy ? { groupBy } : {}) }).toString();
+  return get(`/dashboard/report?${qs}`);
 }
 
 export function getActivityLog(limit = 100) {

@@ -85,13 +85,26 @@ const equipmentStats = asyncHandler(async (req, res) => {
   res.json({ data: rows });
 });
 
+// 집계 기준 드롭다운에서 고를 수 있는 값 -> 실제 컬럼 매핑. SQL 인젝션 방지를 위해
+// 화이트리스트에 있는 값만 컬럼명으로 사용한다 (req.query 값을 직접 보간하지 않음).
+const REPORT_GROUP_BY_COLUMNS = {
+  equipment_name: 'equipment_name',
+  symptom_text: 'symptom_text',
+  work_team: 'work_team',
+  work_name: 'work_name',
+  work_content: 'work_content',
+  maintenance_type: 'maintenance_type',
+};
+
 const report = asyncHandler(async (req, res) => {
   const { dateFrom, dateTo } = req.query;
+  const groupBy = REPORT_GROUP_BY_COLUMNS[req.query.groupBy] ? req.query.groupBy : 'equipment_name';
+  const groupByColumn = REPORT_GROUP_BY_COLUMNS[groupBy];
   if (!dateFrom || !dateTo) {
     return res.status(400).json({ error: { message: 'dateFrom, dateTo가 필요합니다' } });
   }
 
-  const [byTypeResult, topEquipmentResult, newTermsResult, topPartsResult, companiesResult] = await Promise.all([
+  const [byTypeResult, topGroupResult, newTermsResult, topPartsResult, companiesResult] = await Promise.all([
     pool.query(
       `SELECT maintenance_type, COUNT(*)::int AS count
        FROM maintenance_records
@@ -100,12 +113,11 @@ const report = asyncHandler(async (req, res) => {
       [dateFrom, dateTo]
     ),
     pool.query(
-      `SELECT e.id AS equipment_id, e.equipment_name, COUNT(*)::int AS breakdown_count
-       FROM maintenance_records mr
-       JOIN equipment e ON e.id = mr.equipment_id
-       WHERE mr.is_deleted = false AND mr.maintenance_type = 'breakdown_repair' AND mr.record_date BETWEEN $1 AND $2
-       GROUP BY e.id, e.equipment_name
-       ORDER BY breakdown_count DESC
+      `SELECT ${groupByColumn} AS group_value, COUNT(*)::int AS count
+       FROM maintenance_records
+       WHERE is_deleted = false AND record_date BETWEEN $1 AND $2 AND ${groupByColumn} IS NOT NULL
+       GROUP BY ${groupByColumn}
+       ORDER BY count DESC
        LIMIT 10`,
       [dateFrom, dateTo]
     ),
@@ -140,7 +152,8 @@ const report = asyncHandler(async (req, res) => {
       dateTo,
       totalRecords,
       byType: byTypeResult.rows,
-      topEquipment: topEquipmentResult.rows,
+      groupBy,
+      topGroup: topGroupResult.rows,
       newTermsCount: newTermsResult.rows[0].count,
       topParts: topPartsResult.rows,
       companyCount: companiesResult.rows[0].count,

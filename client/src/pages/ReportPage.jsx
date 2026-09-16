@@ -5,7 +5,16 @@ import * as recordsApi from '../api/records.api';
 import { EmptyState } from '../components/EmptyState';
 import { StatCard } from '../components/StatCard';
 import { useToast } from '../components/ToastProvider';
-import { exportReportExcel, exportReportWord, exportReportPdf, DETAIL_FIELD_DEFS, formatDetailField } from '../utils/reportExport';
+import {
+  exportReportExcel,
+  exportReportWord,
+  exportReportPdf,
+  DETAIL_FIELD_DEFS,
+  formatDetailField,
+  GROUP_BY_DEFS,
+  groupByLabel,
+  formatGroupValue,
+} from '../utils/reportExport';
 
 const DETAIL_ROW_LIMIT = 1000;
 
@@ -74,6 +83,7 @@ export function ReportPage() {
   );
   const [detailRecords, setDetailRecords] = useState(null);
   const [detailTruncated, setDetailTruncated] = useState(false);
+  const [groupBy, setGroupBy] = useState('equipment_name');
 
   const years = currentYearOptions();
 
@@ -113,6 +123,17 @@ export function ReportPage() {
     setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
+  async function handleGroupByChange(newGroupBy) {
+    setGroupBy(newGroupBy);
+    if (!report) return;
+    try {
+      const updated = await dashboardApi.getReport(report.dateFrom, report.dateTo, newGroupBy);
+      setReport(updated);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  }
+
   function currentRange() {
     return mode === 'month' ? monthRange(year, month) : quarterRange(year, quarter);
   }
@@ -125,7 +146,7 @@ export function ReportPage() {
     setDetailRecords(null);
     setDetailTruncated(false);
     Promise.all([
-      dashboardApi.getReport(range.dateFrom, range.dateTo),
+      dashboardApi.getReport(range.dateFrom, range.dateTo, groupBy),
       recordsApi.listRecords({
         equipmentIds: selectedEquipment.length > 0 ? selectedEquipment.map((e) => e.id).join(',') : undefined,
         dateFrom: range.dateFrom,
@@ -291,25 +312,37 @@ export function ReportPage() {
 
           <div className="card">
             <div className="card-t">
-              <span>고장수리 TOP 10 설비</span>
-              <small>이 기간 고장/교체가 가장 많았던 설비</small>
+              <span>{groupByLabel(report.groupBy)} TOP 10</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <small className="no-print">집계 기준</small>
+                <select
+                  className="no-print"
+                  value={groupBy}
+                  onChange={(e) => handleGroupByChange(e.target.value)}
+                  style={{ fontSize: 12.5, padding: '3px 8px' }}
+                >
+                  {GROUP_BY_DEFS.map((g) => (
+                    <option key={g.key} value={g.key}>{g.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            {report.topEquipment.length === 0 ? (
-              <EmptyState>이 기간에 고장수리 이력이 없습니다.</EmptyState>
+            {report.topGroup.length === 0 ? (
+              <EmptyState>이 기간에 해당하는 이력이 없습니다.</EmptyState>
             ) : (
               <div className="table-scroll">
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th>설비명</th>
-                      <th>고장수리 건수</th>
+                      <th>{groupByLabel(report.groupBy)}</th>
+                      <th>건수</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {report.topEquipment.map((e) => (
-                      <tr key={e.equipment_id}>
-                        <td>{e.equipment_name}</td>
-                        <td className="mono">{e.breakdown_count}</td>
+                    {report.topGroup.map((g) => (
+                      <tr key={g.group_value}>
+                        <td>{formatGroupValue(report.groupBy, g.group_value)}</td>
+                        <td className="mono">{g.count}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -48,6 +48,26 @@ export function formatDetailField(key, record) {
   return value === null || value === undefined || value === '' ? '-' : value;
 }
 
+// "TOP 10 집계" 섹션에서 고를 수 있는 집계 기준. dashboard.controller.js의
+// REPORT_GROUP_BY_COLUMNS 화이트리스트와 key를 맞춰야 한다.
+export const GROUP_BY_DEFS = [
+  { key: 'equipment_name', label: '설비명' },
+  { key: 'symptom_text', label: '현상' },
+  { key: 'work_team', label: '수행반' },
+  { key: 'work_name', label: '작업명' },
+  { key: 'work_content', label: '작업내용' },
+  { key: 'maintenance_type', label: '정비유형' },
+];
+
+export function groupByLabel(key) {
+  return GROUP_BY_DEFS.find((g) => g.key === key)?.label || key;
+}
+
+export function formatGroupValue(groupBy, value) {
+  if (groupBy === 'maintenance_type') return TYPE_LABELS[value] || value;
+  return value;
+}
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -96,12 +116,13 @@ export function exportReportExcel(report, byType, detail) {
   summarySheet['!cols'] = [{ wch: 22 }, { wch: 18 }];
   XLSX.utils.book_append_sheet(wb, summarySheet, '요약');
 
-  const eqSheet = XLSX.utils.aoa_to_sheet([
-    ['설비명', '고장수리 건수'],
-    ...report.topEquipment.map((e) => [e.equipment_name, e.breakdown_count]),
+  const groupLabel = groupByLabel(report.groupBy);
+  const groupSheet = XLSX.utils.aoa_to_sheet([
+    [groupLabel, '건수'],
+    ...report.topGroup.map((g) => [formatGroupValue(report.groupBy, g.group_value), g.count]),
   ]);
-  eqSheet['!cols'] = [{ wch: 28 }, { wch: 14 }];
-  XLSX.utils.book_append_sheet(wb, eqSheet, '고장수리 TOP10 설비');
+  groupSheet['!cols'] = [{ wch: 28 }, { wch: 14 }];
+  XLSX.utils.book_append_sheet(wb, groupSheet, `${groupLabel} TOP10`);
 
   const partSheet = XLSX.utils.aoa_to_sheet([
     ['부품명', '사용 횟수'],
@@ -218,18 +239,18 @@ export async function exportReportWord(report, byType, detail) {
       summaryRows(report, byType).map(([k, v]) => [k, v])
     ),
     new Paragraph({ text: '' }),
-    new Paragraph({ text: '2. 고장수리 TOP 10 설비', heading: HeadingLevel.HEADING2 }),
+    new Paragraph({ text: `2. ${groupByLabel(report.groupBy)} TOP 10`, heading: HeadingLevel.HEADING2 }),
   ];
 
-  if (report.topEquipment.length > 0) {
+  if (report.topGroup.length > 0) {
     children.push(
       docxTable(
-        ['설비명', '고장수리 건수'],
-        report.topEquipment.map((e) => [e.equipment_name, e.breakdown_count])
+        [groupByLabel(report.groupBy), '건수'],
+        report.topGroup.map((g) => [formatGroupValue(report.groupBy, g.group_value), g.count])
       )
     );
   } else {
-    children.push(new Paragraph({ text: '이 기간에 고장수리 이력이 없습니다.' }));
+    children.push(new Paragraph({ text: '이 기간에 해당하는 이력이 없습니다.' }));
   }
 
   children.push(new Paragraph({ text: '' }), new Paragraph({ text: '3. 자주 사용된 부품 TOP 10', heading: HeadingLevel.HEADING2 }));
@@ -359,15 +380,15 @@ export async function exportReportPdf(report, byType, detail) {
   });
   y = doc.lastAutoTable.finalY + 9;
 
-  sectionTitle('2. 고장수리 TOP 10 설비');
+  sectionTitle(`2. ${groupByLabel(report.groupBy)} TOP 10`);
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [['설비명', '고장수리 건수']],
+    head: [[groupByLabel(report.groupBy), '건수']],
     body:
-      report.topEquipment.length > 0
-        ? report.topEquipment.map((e) => [e.equipment_name, String(e.breakdown_count)])
-        : [['이 기간에 고장수리 이력이 없습니다.', '']],
+      report.topGroup.length > 0
+        ? report.topGroup.map((g) => [String(formatGroupValue(report.groupBy, g.group_value)), String(g.count)])
+        : [['이 기간에 해당하는 이력이 없습니다.', '']],
     styles: { font: 'NanumGothic', fontSize: 9.5, textColor: [40, 46, 60] },
     headStyles: { font: 'NanumGothic', fontStyle: 'bold', fillColor: [193, 54, 54], textColor: 255 },
     theme: 'grid',
