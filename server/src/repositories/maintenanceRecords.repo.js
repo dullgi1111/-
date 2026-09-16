@@ -31,7 +31,9 @@ async function list({ equipment, equipmentIds, equipmentLine, dateFrom, dateTo, 
   const offset = (page - 1) * limit;
   params.push(limit, offset);
   const { rows } = await pool.query(
-    `SELECT * FROM maintenance_records WHERE ${conditions.join(' AND ')} ORDER BY record_date DESC, id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    `SELECT *, substring(equipment_name from '[A-Za-z]{1,2}$') AS equipment_line
+     FROM maintenance_records WHERE ${conditions.join(' AND ')}
+     ORDER BY record_date DESC, id DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
   return rows;

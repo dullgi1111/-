@@ -237,6 +237,7 @@ export function RecordsPage() {
               <thead>
                 <tr>
                   <th>설비명</th>
+                  <th>라인</th>
                   <th>작업일자</th>
                   <th>작업명</th>
                   <th>작업내용</th>
@@ -255,6 +256,7 @@ export function RecordsPage() {
                       onClick={() => setAcknowledgedIds((prev) => new Set(prev).add(r.id))}
                     >
                       <td>{r.equipment_name}</td>
+                      <td className="mono">{r.equipment_line || <span className="text-muted">-</span>}</td>
                       <td className="mono">{r.record_date}</td>
                       <td className="ellipsis-cell" title={r.work_name || ''}>{r.work_name || <span className="text-muted">-</span>}</td>
                       <td>{r.work_content || <span className="text-muted">-</span>}</td>
