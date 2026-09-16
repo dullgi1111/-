@@ -76,8 +76,8 @@ export function buildScopeLine(detail) {
   if (detail.equipmentFilter?.length > 0) {
     parts.push(`설비: ${detail.equipmentFilter.map((e) => e.equipment_name).join(', ')}`);
   }
-  if (detail.lineFilter) {
-    parts.push(`설비라인: ${detail.lineFilter}`);
+  if (detail.lineFilters?.length > 0) {
+    parts.push(`설비라인: ${detail.lineFilters.join(', ')}`);
   }
   return parts.length > 0 ? `대상 ${parts.join(' · ')}` : '대상 설비: 전체';
 }

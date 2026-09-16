@@ -85,7 +85,8 @@ export function ReportPage() {
   const [detailRecords, setDetailRecords] = useState(null);
   const [detailTruncated, setDetailTruncated] = useState(false);
   const [groupBy, setGroupBy] = useState('equipment_name');
-  const [equipmentLine, setEquipmentLine] = useState('');
+  const [selectedLines, setSelectedLines] = useState([]);
+  const [lineQuery, setLineQuery] = useState('');
   const [equipmentLines, setEquipmentLines] = useState([]);
 
   const years = currentYearOptions();
@@ -126,6 +127,21 @@ export function ReportPage() {
     setSelectedEquipment((prev) => prev.filter((e) => e.id !== id));
   }
 
+  function addLine(line) {
+    setSelectedLines((prev) => (prev.includes(line) ? prev : [...prev, line]));
+    setLineQuery('');
+  }
+
+  function removeLine(line) {
+    setSelectedLines((prev) => prev.filter((l) => l !== line));
+  }
+
+  const lineSuggestions = lineQuery.trim()
+    ? equipmentLines.filter(
+        (l) => l.line.toLowerCase().includes(lineQuery.trim().toLowerCase()) && !selectedLines.includes(l.line)
+      )
+    : [];
+
   function toggleField(key) {
     setSelectedFields((prev) => ({ ...prev, [key]: !prev[key] }));
   }
@@ -156,7 +172,7 @@ export function ReportPage() {
       dashboardApi.getReport(range.dateFrom, range.dateTo, groupBy),
       recordsApi.listRecords({
         equipmentIds: selectedEquipment.length > 0 ? selectedEquipment.map((e) => e.id).join(',') : undefined,
-        equipmentLine: equipmentLine || undefined,
+        equipmentLines: selectedLines.length > 0 ? selectedLines.join(',') : undefined,
         dateFrom: range.dateFrom,
         dateTo: range.dateTo,
         limit: DETAIL_ROW_LIMIT,
@@ -183,7 +199,7 @@ export function ReportPage() {
         fieldKeys: activeFieldKeys,
         truncated: detailTruncated,
         equipmentFilter: selectedEquipment,
-        lineFilter: equipmentLine || null,
+        lineFilters: selectedLines,
       };
       if (format === 'excel') {
         exportReportExcel(report, byType, detail);
@@ -288,15 +304,40 @@ export function ReportPage() {
           </div>
         )}
 
-        <div className="field">
-          <label>설비라인 (선택하지 않으면 전체)</label>
-          <select value={equipmentLine} onChange={(e) => setEquipmentLine(e.target.value)}>
-            <option value="">전체</option>
-            {equipmentLines.map((l) => (
-              <option key={l.line} value={l.line}>{l.line} ({l.count})</option>
-            ))}
-          </select>
+        <div className="field" style={{ position: 'relative' }}>
+          <label>설비라인 (선택하지 않으면 전체, 여러 개 선택 가능)</label>
+          <input
+            placeholder="설비라인 검색 후 선택 (예: P, LP, TS)"
+            value={lineQuery}
+            onChange={(e) => setLineQuery(e.target.value)}
+          />
+          {lineSuggestions.length > 0 && (
+            <div
+              className="card"
+              style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 5, marginTop: 4, padding: 6, maxHeight: 260, overflowY: 'auto' }}
+            >
+              {lineSuggestions.map((l) => (
+                <div
+                  key={l.line}
+                  className="chip"
+                  style={{ display: 'block', marginBottom: 4, cursor: 'pointer' }}
+                  onClick={() => addLine(l.line)}
+                >
+                  {l.line} ({l.count})
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+        {selectedLines.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+            {selectedLines.map((l) => (
+              <span key={l} className="chip active" onClick={() => removeLine(l)}>
+                {l} ✕
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="field">
           <label>포함할 항목</label>
@@ -408,7 +449,7 @@ export function ReportPage() {
             <div className="card-t">
               <span>정비 상세 내역</span>
               <small>
-                {buildScopeLine({ equipmentFilter: selectedEquipment, lineFilter: equipmentLine || null })} ·{' '}
+                {buildScopeLine({ equipmentFilter: selectedEquipment, lineFilters: selectedLines })} ·{' '}
                 {detailRecords?.length || 0}건{detailTruncated ? ` (최대 ${DETAIL_ROW_LIMIT}건까지 표시, 초과분은 잘림)` : ''}
               </small>
             </div>

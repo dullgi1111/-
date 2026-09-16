@@ -102,7 +102,7 @@ export function RecordsPage() {
         equipment,
         maintenanceType,
         month,
-        equipmentLine,
+        equipmentLines: equipmentLine || undefined,
         symptomTexts: selectedSymptoms.length > 0 ? selectedSymptoms.join(',') : undefined,
         workTeams: selectedTeams.length > 0 ? selectedTeams.join(',') : undefined,
         dateFrom: dateRange.dateFrom,
