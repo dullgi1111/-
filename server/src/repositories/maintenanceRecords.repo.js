@@ -16,7 +16,7 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-async function list({ equipment, equipmentIds, equipmentLines, symptomTexts, workTeams, dateFrom, dateTo, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
+async function list({ equipment, equipmentIds, equipmentLines, symptomTexts, workTeams, dateFrom, dateTo, year, month, maintenanceType, companySource, needsTypeReview, page = 1, limit = 50 } = {}) {
   const conditions = ['is_deleted = false'];
   const params = [];
   if (equipment) { params.push(`%${equipment}%`); conditions.push(`equipment_name ILIKE $${params.length}`); }
@@ -26,6 +26,7 @@ async function list({ equipment, equipmentIds, equipmentLines, symptomTexts, wor
   if (workTeams && workTeams.length > 0) { params.push(workTeams); conditions.push(`work_team = ANY($${params.length})`); }
   if (dateFrom) { params.push(dateFrom); conditions.push(`record_date >= $${params.length}`); }
   if (dateTo) { params.push(dateTo); conditions.push(`record_date <= $${params.length}`); }
+  if (year) { params.push(Number(year)); conditions.push(`EXTRACT(YEAR FROM record_date) = $${params.length}`); }
   if (month) { params.push(Number(month)); conditions.push(`EXTRACT(MONTH FROM record_date) = $${params.length}`); }
   if (maintenanceType) { params.push(maintenanceType); conditions.push(`maintenance_type = $${params.length}`); }
   if (companySource) { params.push(companySource); conditions.push(`company_source = $${params.length}`); }

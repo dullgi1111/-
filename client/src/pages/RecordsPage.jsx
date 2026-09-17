@@ -14,6 +14,12 @@ const MONTH_FILTERS = [
   ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `${i + 1}월` })),
 ];
 
+const nowYear = new Date().getFullYear();
+const YEAR_FILTERS = [
+  { value: '', label: '전체 연도' },
+  ...Array.from({ length: 6 }, (_, i) => ({ value: String(nowYear - i), label: `${nowYear - i}년` })),
+];
+
 const MAINTENANCE_TYPE_LABELS = {
   breakdown_repair: '고장수리',
   preventive_inspection: '예방점검',
@@ -52,6 +58,7 @@ export function RecordsPage() {
   const [searchParams] = useSearchParams();
   const [equipment, setEquipment] = useState('');
   const [maintenanceType, setMaintenanceType] = useState(searchParams.get('maintenanceType') || '');
+  const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [equipmentLine, setEquipmentLine] = useState('');
   const [equipmentLines, setEquipmentLines] = useState([]);
@@ -101,6 +108,7 @@ export function RecordsPage() {
       .listRecords({
         equipment,
         maintenanceType,
+        year,
         month,
         equipmentLines: equipmentLine || undefined,
         symptomTexts: selectedSymptoms.length > 0 ? selectedSymptoms.join(',') : undefined,
@@ -118,7 +126,7 @@ export function RecordsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maintenanceType, month, equipmentLine, selectedSymptoms, selectedTeams, dateRange, needsTypeReview]);
+  }, [maintenanceType, year, month, equipmentLine, selectedSymptoms, selectedTeams, dateRange, needsTypeReview]);
 
   function clearDateRange() {
     setDateRange({ dateFrom: '', dateTo: '' });
@@ -202,6 +210,11 @@ export function RecordsPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+        <select value={year} onChange={(e) => setYear(e.target.value)}>
+          {YEAR_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>{f.label}</option>
+          ))}
+        </select>
         {MONTH_FILTERS.map((f) => (
           <span
             key={f.value}
